@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="8481983e-00bc-45f6-97d1-c9e94c7c75e4" name="UPS - SULL">
+        <fileTransfer rootFolder="/var/www/html/sullivanpaper.com/releases/2/isotope-ups-shipping" accessType="SFTP" host="69.164.212.53" port="22" sshConfigId="268bda40-6ae7-4048-8845-8babe92075a1" sshConfig="SULLIVAN" keyPair="true">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
