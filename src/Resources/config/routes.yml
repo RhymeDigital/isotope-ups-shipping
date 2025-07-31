@@ -1,0 +1,4 @@
+# config/routes.yml
+rhymedigital_contao_rhyme_isotope_ups_shipping.controller:
+    resource: ../../../src/Controller
+    type: annotation

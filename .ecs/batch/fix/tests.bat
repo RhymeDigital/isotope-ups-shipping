@@ -1,0 +1,10 @@
+:: Run easy-coding-standard (ecs) via this batch file inside your IDE e.g. PhpStorm (Windows only)
+:: Install inside PhpStorm the  "Batch Script Support" plugin
+cd..
+cd..
+cd..
+cd..
+cd..
+cd..
+vendor\bin\ecs check vendor/rhymedigital/contao-rhyme-isotope-ups-shipping/tests --fix --config vendor/rhymedigital/contao-rhyme-isotope-ups-shipping/.ecs/config/default.php
+cd vendor/rhymedigital/contao-rhyme-isotope-ups-shipping/.ecs./batch/fix

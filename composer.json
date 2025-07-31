@@ -1,0 +1,56 @@
+{
+  "name": "rhymedigital/contao-rhyme-isotope-ups-shipping",
+  "description": "A Contao bundle that gives you the ability to use certain features of the UPS API in Isotope eCommerce.",
+  "keywords": [
+    "contao",
+    "bundle",
+    "isotope",
+    "ups",
+    "shipping"
+  ],
+  "type": "contao-bundle",
+  "license": "GPL-3.0-or-later",
+  "authors": [
+    {
+      "name": "Rhyme Digital",
+      "email": "info@rhyme.digital",
+      "homepage": "https://rhyme.digital",
+      "role": "Developer"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/rhymedigital/contao-rhyme-isotope-ups-shipping/issues",
+    "source": "https://github.com/rhymedigital/contao-rhyme-isotope-ups-shipping"
+  },
+  "require": {
+    "php": "^7.0 || ^8.0",
+    "contao/core-bundle": "^4.13"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest",
+    "contao/manager-plugin": "^2.3.1",
+    "contao/test-case": "^4.5",
+    "phpunit/phpunit": "^9.3",
+    "symfony/http-client": "5.4.*",
+    "symfony/phpunit-bridge": "^5.4",
+    "contao/easy-coding-standard": "^3.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Rhymedigital\\ContaoRhymeIsotopeUpsShipping\\": "src/"
+    },
+    "classmap": [
+      "src/Resources/contao"
+    ],
+    "exclude-from-classmap": [
+      "src/Resources/contao/config",
+      "src/Resources/contao/dca",
+      "src/Resources/contao/languages",
+      "src/Resources/contao/templates"
+    ]
+  },
+  "extra": {
+    "contao-manager-plugin": "Rhymedigital\\ContaoRhymeIsotopeUpsShipping\\ContaoManager\\Plugin"
+  },
+  "version": "1.0.0"
+}
