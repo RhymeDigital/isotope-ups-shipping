@@ -6,5 +6,5 @@ cd..
 cd..
 cd..
 cd..
-vendor\bin\ecs check vendor/rhymedigital/contao-rhyme-isotope-ups-shipping/src --config vendor/rhymedigital/contao-rhyme-isotope-ups-shipping/.ecs/config/default.php
-cd vendor/rhymedigital/contao-rhyme-isotope-ups-shipping/.ecs./batch/check
+vendor\bin\ecs check vendor/rhymedigital/isotope-ups-shipping/src --config vendor/rhymedigital/isotope-ups-shipping/.ecs/config/default.php
+cd vendor/rhymedigital/isotope-ups-shipping/.ecs./batch/check

@@ -8,13 +8,13 @@ services:
         bind:
             #$projectDir: '%kernel.project_dir%'
 
-    Rhymedigital\ContaoRhymeIsotopeUpsShipping\:
+    Rhymedigital\IsotopeUpsShipping\:
         resource: ../../
         exclude: ../../{DependencyInjection,Resources,Model}
 
     # Add a session bag
-    Rhymedigital\ContaoRhymeIsotopeUpsShipping\Session\Attribute\ArrayAttributeBag:
+    Rhymedigital\IsotopeUpsShipping\Session\Attribute\ArrayAttributeBag:
         arguments:
-            - _rhymedigital_contao_rhyme_isotope_ups_shipping_attributes
+            - _rhymedigital_isotope_ups_shipping_attributes
         calls:
-            - [ setName, [ rhymedigital_contao_rhyme_isotope_ups_shipping ] ]
+            - [ setName, [ rhymedigital_isotope_ups_shipping ] ]

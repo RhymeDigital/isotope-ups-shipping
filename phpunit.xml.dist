@@ -11,7 +11,7 @@
     </php>
 
     <testsuites>
-        <testsuite name="contao-rhyme-isotope-ups-shipping">
+        <testsuite name="isotope-ups-shipping">
             <directory>./tests</directory>
         </testsuite>
     </testsuites>

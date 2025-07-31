@@ -12,7 +12,7 @@ return static function (ECSConfig $ECSConfig): void {
     $services
         ->set(HeaderCommentFixer::class)
         ->call('configure', [[
-            'header' => "This file is part of Isotope UPS Shipping.\n\n(c) Rhyme Digital 2025 <info@rhyme.digital>\n@license GPL-3.0-or-later\nFor the full copyright and license information,\nplease view the LICENSE file that was distributed with this source code.\n@link https://github.com/rhymedigital/contao-rhyme-isotope-ups-shipping",
+            'header' => "This file is part of Isotope UPS Shipping.\n\n(c) Rhyme Digital 2025 <info@rhyme.digital>\n@license GPL-3.0-or-later\nFor the full copyright and license information,\nplease view the LICENSE file that was distributed with this source code.\n@link https://github.com/rhymedigital/isotope-ups-shipping",
         ]])
     ;
 };

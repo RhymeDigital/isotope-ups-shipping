@@ -9,10 +9,10 @@ declare(strict_types=1);
  * @license GPL-3.0-or-later
  * For the full copyright and license information,
  * please view the LICENSE file that was distributed with this source code.
- * @link https://github.com/rhymedigital/contao-rhyme-isotope-ups-shipping
+ * @link https://github.com/rhymedigital/isotope-ups-shipping
  */
 
-namespace Rhymedigital\ContaoRhymeIsotopeUpsShipping\ContaoManager;
+namespace Rhymedigital\IsotopeUpsShipping\ContaoManager;
 
 use Contao\ManagerPlugin\Bundle\BundlePluginInterface;
 use Contao\ManagerPlugin\Bundle\Config\BundleConfig;
@@ -29,7 +29,7 @@ class Plugin implements BundlePluginInterface, RoutingPluginInterface
     public function getBundles(ParserInterface $parser): array
     {
         return [
-            BundleConfig::create('Rhymedigital\ContaoRhymeIsotopeUpsShipping\RhymedigitalContaoRhymeIsotopeUpsShipping')
+            BundleConfig::create('Rhymedigital\IsotopeUpsShipping\RhymedigitalIsotopeUpsShipping')
                 ->setLoadAfter(['Contao\CoreBundle\ContaoCoreBundle']),
         ];
     }
