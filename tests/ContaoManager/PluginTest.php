@@ -7,23 +7,23 @@
  * @license GPL-3.0-or-later
  * For the full copyright and license information,
  * please view the LICENSE file that was distributed with this source code.
- * @link https://github.com/rhymedigital/contao-rhyme-isotope-ups-shipping
+ * @link https://github.com/rhymedigital/isotope-ups-shipping
  */
 declare(strict_types=1);
 
-namespace Rhymedigital\ContaoRhymeIsotopeUpsShipping\Tests\ContaoManager;
+namespace Rhymedigital\IsotopeUpsShipping\Tests\ContaoManager;
 
 use Contao\CoreBundle\ContaoCoreBundle;
 use Contao\ManagerPlugin\Bundle\Config\BundleConfig;
 use Contao\ManagerPlugin\Bundle\Parser\DelegatingParser;
 use Contao\TestCase\ContaoTestCase;
-use Rhymedigital\ContaoRhymeIsotopeUpsShipping\ContaoManager\Plugin;
-use Rhymedigital\ContaoRhymeIsotopeUpsShipping\RhymedigitalContaoRhymeIsotopeUpsShipping;
+use Rhymedigital\IsotopeUpsShipping\ContaoManager\Plugin;
+use Rhymedigital\IsotopeUpsShipping\RhymedigitalIsotopeUpsShipping;
 
 /**
  * Class PluginTest
  *
- * @package Rhymedigital\ContaoRhymeIsotopeUpsShipping\Tests\ContaoManager
+ * @package Rhymedigital\IsotopeUpsShipping\Tests\ContaoManager
  */
 class PluginTest extends ContaoTestCase
 {
@@ -47,7 +47,7 @@ class PluginTest extends ContaoTestCase
 
         $this->assertCount(1, $bundles);
         $this->assertInstanceOf(BundleConfig::class, $bundles[0]);
-        $this->assertSame(RhymedigitalContaoRhymeIsotopeUpsShipping::class, $bundles[0]->getName());
+        $this->assertSame(RhymedigitalIsotopeUpsShipping::class, $bundles[0]->getName());
         $this->assertSame([ContaoCoreBundle::class], $bundles[0]->getLoadAfter());
     }
 
