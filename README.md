@@ -1,5 +1,5 @@
-![Alt text](docs/logo.png?raw=true "logo")
+<p align="center"><img src="docs/logo.png" alt="Rhyme Digital logo"></p>
 
+# Welcome to the Isotope UPS Shipping bundle for Contao CMS.
 
-# Welcome to Isotope UPS Shipping
 This bundle is still under construction.
