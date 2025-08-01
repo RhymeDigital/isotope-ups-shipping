@@ -15,6 +15,7 @@ use Contao\Model;
 use Contao\Cache;
 use Isotope\Interfaces\IsotopeProductCollection;
 use Isotope\Isotope;
+use Isotope\Model\ProductCollectionItem;
 use Isotope\Model\Shipping as Iso_Shipping;
 use Ups\Rate as Ups_Rate;
 use Ups\Entity\Address as Ups_Address;
@@ -31,9 +32,7 @@ use Ups\Entity\ShipTo as Ups_ShipTo;
 use Ups\Entity\Shipper as Ups_Shipper;
 use Ups\Entity\UnitOfMeasurement as Ups_UnitOfMeasurement;
 use stdClass;
-use Haste\Units\Mass\Scale;
-use Haste\Units\Mass\Weighable;
-use Haste\Units\Mass\WeightAggregate;
+use Rhymedigital\IsotopeUpsShipping\Helper\ShippingHelper;
 
 class UPS extends Iso_Shipping
 {
@@ -64,33 +63,28 @@ class UPS extends Iso_Shipping
         $fltPrice = 0.00;
         $objCollection = $objCollection ?? Isotope::getCart();
 
-        if (($shippingMethod = $objCollection->getShippingMethod()) === null) {
-            return $fltPrice;
-        }
-
         // Get a hash for the cache
-        $strHash = static::makeHash($objCollection, array($this->ups_enabledService));
+        $strHash = static::makeHash($objCollection, array($this->rhyme_ups_enabled_service));
 
-        if(!Cache::has($strHash)) {
+        if (!Cache::has($strHash)) {
 
             // Build shipment
             $upsShipment = $this->buildShipmentFromCollection($objCollection);
 
             // UPS Rate Object
             $rate = new Ups_Rate(
-                $shippingMethod->UpsAccessKey,
-                $shippingMethod->UpsUsername,
-                $shippingMethod->UpsPassword,
-                $shippingMethod->UpsMode === 'test'
+                $this->rhyme_ups_access_key,
+                $this->rhyme_ups_username,
+                $this->rhyme_ups_password,
+                $this->rhyme_ups_mode === 'test'
             );
 
-
-            try{
+            //try{
                 $objResponse = $rate->getRate($upsShipment);
                 $fltPrice = (float) $objResponse->RatedShipment[0]->TotalCharges->MonetaryValue;
-            } catch (\Exception $e){
-                //@!TODO post error message
-            }
+//            } catch (\Exception $e){
+//                //@!TODO post error message
+//            }
 
             Cache::set($strHash, $fltPrice);
         }
@@ -106,10 +100,6 @@ class UPS extends Iso_Shipping
      */
     protected function buildShipmentFromCollection(IsotopeProductCollection $objCollection): ?Ups_Shipment
     {
-        if (($shippingMethod = $objCollection->getShippingMethod()) === null) {
-            return null;
-        }
-
         // Get the Iso Config
         $config = Isotope::getConfig();
 
@@ -118,13 +108,13 @@ class UPS extends Iso_Shipping
 
         // Create the service
         $service = new Ups_Service();
-        $service->setCode($this->ups_enabledService);
-        $service->setDescription($GLOBALS['TL_LANG']['tl_iso_shipping']['ups_service'][$this->ups_enabledService]);
+        $service->setCode($this->rhyme_ups_enabled_service);
+        $service->setDescription($GLOBALS['TL_LANG']['tl_iso_shipping']['rhyme_ups_services'][$this->rhyme_ups_enabled_service]);
         $shipment->setService($service);
 
         // Build Shipper information
         $shipper = new Ups_Shipper();
-        $shipper->setShipperNumber($shippingMethod->UpsAccountNumber);
+        $shipper->setShipperNumber($this->rhyme_ups_account_number);
 
         // ShipFrom Address
         $shipFromAddress = static::buildAddress($config);
@@ -177,10 +167,11 @@ class UPS extends Iso_Shipping
 
     /**
      * Build a UPS Compatible Package Object
-     * @param IsotopeProductCollection
-     * @return stdClass
+     *
+     * @param IsotopeProductCollection $objCollection
+     * @return array
      */
-    protected function buildPackages(IsotopeProductCollection $objCollection)
+    protected function buildPackages(IsotopeProductCollection $objCollection): array
     {
     	$arrPackages = array();
 
@@ -188,86 +179,52 @@ class UPS extends Iso_Shipping
     	{
 			$product = $objItem->getProduct();
 			$arrDimensions = $product->package_dimensions;
-	        $Package = new Ups_Package();
-			$strWeight = strval($this->getShippingWeight($objItem, 'lb'));
+	        $package = new Ups_Package();
+			$strWeight = (string)ShippingHelper::getShippingWeight($objItem, 'lb');
 
             for ($i = 0; $i < $objItem->quantity; $i++) {
 
 		        //Packaging Type
-		        $PackagingType = new Ups_PackagingType();
-		        $PackagingType->setCode('02'); //Box for now
-		        $PackagingType->setDescription('');
-		        $Package->setPackagingType($PackagingType);
+		        $packagingType = new Ups_PackagingType();
+		        $packagingType->setCode('02'); //Box for now
+		        $packagingType->setDescription('');
+		        $package->setPackagingType($packagingType);
 
 		        //Package Dimensions
-		        $Dimensions = new Ups_Dimensions();
-		        $UnitOfMeasurementD = new Ups_UnitOfMeasurement();
-		        $UnitOfMeasurementD->setCode('IN');
-		        $Dimensions->setUnitOfMeasurement($UnitOfMeasurementD);
-		        $Dimensions->setLength(round($arrDimensions[0]));
-		        $Dimensions->setWidth(round($arrDimensions[1]));
-		        $Dimensions->setHeight(round($arrDimensions[2]));
-		        $Package->setDimensions($Dimensions);
+		        $dimensions = new Ups_Dimensions();
+		        $dimensionsUom = new Ups_UnitOfMeasurement();
+		        $dimensionsUom->setCode('IN');
+		        $dimensions->setUnitOfMeasurement($dimensionsUom);
+		        $dimensions->setLength(round($arrDimensions[0]));
+		        $dimensions->setWidth(round($arrDimensions[1]));
+		        $dimensions->setHeight(round($arrDimensions[2]));
+		        $package->setDimensions($dimensions);
 
 		        //Package Weight
-		        $PackageWeight = new Ups_PackageWeight();
-		        $UnitOfMeasurementW = new Ups_UnitOfMeasurement();
-		        $UnitOfMeasurementW->setCode('LBS');
-		        $PackageWeight->setUnitOfMeasurement($UnitOfMeasurementW);
-		        $PackageWeight->setWeight($strWeight == 0 ? '1' : $strWeight);
-		        $Package->setPackageWeight($PackageWeight);
+		        $packageWeight = new Ups_PackageWeight();
+		        $weightUom = new Ups_UnitOfMeasurement();
+		        $weightUom->setCode('LBS');
+		        $packageWeight->setUnitOfMeasurement($weightUom);
+		        $packageWeight->setWeight(!$strWeight ? '1' : $strWeight);
+		        $package->setPackageWeight($packageWeight);
 
 		        //Insured Value
-				if ($this->ups_insure_packages)
+				if ($this->rhyme_ups_insure_packages)
 				{
-			        $InsuredValue = new Ups_InsuredValue();
-			        $InsuredValue->setCurrencyCode('USD'); //For now
-			        $InsuredValue->setMonetaryValue($objItem->getProduct()->getPrice()->getAmount(1));
-			        $PackageServiceOptions = new Ups_PackageServiceOptions();
-			        $PackageServiceOptions->setInsuredValue($InsuredValue);
-			        $Package->setPackageServiceOptions($PackageServiceOptions);
+			        $insuredValue = new Ups_InsuredValue();
+			        $insuredValue->setCurrencyCode('USD'); //For now
+			        $insuredValue->setMonetaryValue($objItem->getProduct()->getPrice()->getAmount());
+			        $packageServiceOptions = new Ups_PackageServiceOptions();
+			        $packageServiceOptions->setInsuredValue($insuredValue);
+			        $package->setPackageServiceOptions($packageServiceOptions);
 				}
 
-		        $arrPackages[] = $Package;
+		        $arrPackages[] = $package;
 	        }
     	}
 
         return $arrPackages;
     }
-
-
-
-	/**
-	 * Calculate the weight of all products in the cart in a specific weight unit
-	 *
-	 * @access public
-	 * @param array
-	 * @param string
-	 * @return string
-	 */
-	public static function getShippingWeight($objItem, $unit)
-	{
-        $objScale = new Scale();
-
-        if (!$objItem->hasProduct()) {
-            return 0.0;
-        }
-
-        $objProduct = $objItem->getProduct();
-
-        if ($objProduct instanceof WeightAggregate) {
-            $objWeight = $objProduct->getWeight();
-
-            if (null !== $objWeight) {
-                $objScale->add($objWeight);
-            }
-
-        } elseif ($objProduct instanceof Weighable) {
-            $objScale->add($objProduct);
-        }
-
-        return $objScale->amountIn($unit);
-	}
 
 
     /**
