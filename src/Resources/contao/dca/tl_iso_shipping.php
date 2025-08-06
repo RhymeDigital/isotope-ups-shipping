@@ -26,9 +26,8 @@ namespace {
     PaletteManipulator::create()
         ->removeField('flatCalculation', 'price_legend')
         ->addLegend('ups_legend', 'title_legend')
-        ->addField('rhyme_ups_access_key', 'ups_legend', PaletteManipulator::POSITION_APPEND)
-        ->addField('rhyme_ups_username', 'ups_legend', PaletteManipulator::POSITION_APPEND)
-        ->addField('rhyme_ups_password', 'ups_legend', PaletteManipulator::POSITION_APPEND)
+        ->addField('rhyme_ups_client_id', 'ups_legend', PaletteManipulator::POSITION_APPEND)
+        ->addField('rhyme_ups_client_secret', 'ups_legend', PaletteManipulator::POSITION_APPEND)
         ->addField('rhyme_ups_account_number', 'ups_legend', PaletteManipulator::POSITION_APPEND)
         ->addField('rhyme_ups_enabled_service', 'ups_legend', PaletteManipulator::POSITION_APPEND)
         ->addField('rhyme_ups_mode', 'ups_legend', PaletteManipulator::POSITION_APPEND)
@@ -40,19 +39,13 @@ namespace {
      * Fields
      */
     $dca['fields'] = \array_merge($dca['fields'], [
-        'rhyme_ups_access_key' => [
-            'exclude'                 => true,
-            'inputType'               => 'text',
-            'eval'                    => ['mandatory' => true, 'tl_class' => 'clr'],
-            'sql'                     => "text NULL"
-        ],
-        'rhyme_ups_username' => [
+        'rhyme_ups_client_id' => [
             'exclude'                 => true,
             'inputType'               => 'text',
             'eval'                    => ['mandatory' => true, 'maxlength' => 255, 'tl_class' => 'w50 clr'],
             'sql'                     => "varchar(255) NOT NULL default ''"
         ],
-        'rhyme_ups_password' => [
+        'rhyme_ups_client_secret' => [
             'exclude'                 => true,
             'inputType'               => 'text',
             'eval'                    => ['mandatory' => true, 'maxlength' => 255, 'hideInput' => true, 'tl_class' => 'w50'],
@@ -61,8 +54,8 @@ namespace {
         'rhyme_ups_account_number' => [
             'exclude'                 => true,
             'inputType'               => 'text',
-            'eval'                    => ['mandatory'=>true, 'maxlength' => 255, 'tl_class' => 'w50 clr'],
-            'sql'                     => "varchar(255) NOT NULL default ''"
+            'eval'                    => ['mandatory'=>true, 'maxlength' => 6, 'tl_class' => 'w50 clr'],
+            'sql'                     => "varchar(6) NOT NULL default ''"
         ],
         'rhyme_ups_enabled_service' => [
             'exclude'                 => true,
@@ -71,19 +64,20 @@ namespace {
             'eval'                    => ['mandatory' => true, 'tl_class' => 'w50'],
             'sql'                     => "varchar(255) NOT NULL default ''"
         ],
-        'rhyme_ups_insure_packages' => [
+        'rhyme_ups_packaging' => [
             'exclude'                 => true,
-            'inputType'               => 'checkbox',
-            'eval'                    => ['tl_class' => 'w50'],
-            'sql'                     => "char(1) NOT NULL default ''"
+            'inputType'               => 'select',
+            'options'                 => $GLOBALS['TL_LANG']['tl_iso_shipping']['rhyme_ups_services'],
+            'eval'                    => ['mandatory' => true, 'tl_class' => 'w50'],
+            'sql'                     => "varchar(255) NOT NULL default ''"
         ],
         'rhyme_ups_mode' => [
             'exclude'                 => true,
-            'default'                 => 'test',
+            'default'                 => 'DEV',
             'inputType'               => 'select',
-            'options'                 => ['test', 'live'],
+            'options'                 => ['DEV', 'PROD'],
             'eval'                    => ['doNotCopy' => true, 'tl_class' => 'w50 clr'],
-            'reference'               => &$GLOBALS['TL_LANG']['MSC']['apiMode'],
+            'reference'               => &$GLOBALS['TL_LANG']['tl_iso_shipping']['rhyme_ups_modes'],
             'sql'                     => "varchar(8) NOT NULL default ''"
         ],
     ]);

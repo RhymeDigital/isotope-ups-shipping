@@ -18,3 +18,7 @@ services:
             - _rhymedigital_isotope_ups_shipping_attributes
         calls:
             - [ setName, [ rhymedigital_isotope_ups_shipping ] ]
+
+    rhyme.isotope.ups_shipping.ups_helper:
+        class: Rhymedigital\IsotopeUpsShipping\Helper\UpsHelper
+        public: true
