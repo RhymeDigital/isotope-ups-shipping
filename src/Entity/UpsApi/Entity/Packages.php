@@ -9,7 +9,7 @@
 
 declare(strict_types=1);
 
-namespace Rhymedigital\IsotopeUpsShipping\Entity\UpsApi;
+namespace Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity;
 
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Package as BasePackage;
 

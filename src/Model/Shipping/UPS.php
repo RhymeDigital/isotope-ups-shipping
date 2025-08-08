@@ -34,15 +34,15 @@ class UPS extends Iso_Shipping
                 return true;
             }
         }
-        catch (Exception $e) {}
+        catch (Exception $e) {
+            // Todo: Add logging here!
+        }
 
         return false;
     }
 
     /**
-     * Return calculated price for this shipping method
-     *
-     * @param ?IsotopeProductCollection $objCollection
+     * @param null|IsotopeProductCollection $objCollection
      * @return float
      */
     public function getPrice(?IsotopeProductCollection $objCollection = null): float
@@ -50,7 +50,15 @@ class UPS extends Iso_Shipping
         $objCollection = $objCollection ?? Isotope::getCart();
         $fltPrice = parent::getPrice($objCollection);
 
-        return $this->getLiveRateQuote($objCollection) + $fltPrice;
+        try {
+            $quote = $this->getLiveRateQuote($objCollection);
+            $fltPrice += $quote ?? 0.0;
+        }
+        catch (Exception $e) {
+            // Todo: Add logging here!
+        }
+
+        return $fltPrice;
     }
 
 

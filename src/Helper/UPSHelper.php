@@ -11,11 +11,21 @@ declare(strict_types=1);
 
 namespace Rhymedigital\IsotopeUpsShipping\Helper;
 
+use Contao\Controller;
+use Contao\StringUtil;
 use Exception;
+use Haste\Units\Mass\Scale;
+use Haste\Units\Mass\Weighable;
+use Haste\Units\Mass\WeightAggregate;
+use Isotope\Interfaces\IsotopeOrderableCollection;
 use Isotope\Interfaces\IsotopeProductCollection;
 use Isotope\Interfaces\IsotopeShipping;
-use Isotope\Interfaces\IsotopeOrderableCollection;
+use Isotope\Isotope;
+use Isotope\Model\Address as IsoAddress;
+use Isotope\Model\Config;
+use Isotope\Model\ProductCollectionItem;
 use Isotope\Model\Shipping;
+use RahulGodiyal\PhpUpsApiWrapper\Entity\Address;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\BillShipper;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Dimensions;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\LabelImageFormat;
@@ -25,21 +35,11 @@ use RahulGodiyal\PhpUpsApiWrapper\Entity\Package;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\PackageWeight;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Packaging;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\PaymentInformation;
+use RahulGodiyal\PhpUpsApiWrapper\Entity\Phone;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ReferenceNumber;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Request;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Service;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipFrom;
-use Contao\Controller;
-use Contao\StringUtil;
-use Haste\Units\Mass\Scale;
-use Haste\Units\Mass\Weighable;
-use Haste\Units\Mass\WeightAggregate;
-use Isotope\Isotope;
-use Isotope\Model\Config;
-use Isotope\Model\Address as IsoAddress;
-use Isotope\Model\ProductCollectionItem;
-use RahulGodiyal\PhpUpsApiWrapper\Entity\Address;
-use RahulGodiyal\PhpUpsApiWrapper\Entity\Phone;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Shipment;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipmentCharge;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipmentRequest;
@@ -49,9 +49,11 @@ use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipQuery;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipTo;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\UnitOfMeasurement;
 use RahulGodiyal\PhpUpsApiWrapper\Ship;
-use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Packages;
-use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionRateEvent;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\Packages;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequest;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Rating;
 use Rhymedigital\IsotopeUpsShipping\Event\PostProductCollectionRateEvent;
+use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionRateEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\ValidateProductCollectionRateEvent;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -71,9 +73,9 @@ class UPSHelper
      * Gets the shipping rate for a given collection using an optionally provided shipping method and options.
      * If no collection or shipping method is provided, the method uses default values.
      *
-     * @param IsotopeOrderableCollection|null $collection The orderable collection to calculate the shipping rate for. Defaults to the current cart if null.
-     * @param IsotopeShipping|null            $shipping   The specific shipping method to calculate the rate with. Defaults to the collection's shipping method if null.
-     * @param array                           $options    Additional options or configuration for determining the rate.
+     * @param IsotopeOrderableCollection|null $collection    The orderable collection to calculate the shipping rate for. Defaults to the current cart if null.
+     * @param IsotopeShipping|null            $shippingModel The specific shipping method to calculate the rate with. Defaults to the collection's shipping method if null.
+     * @param array                           $options       Additional options or configuration for determining the rate.
      * @return float|null The calculated shipping rate as a float if successful, or null if the operation fails.
      * @throws Exception
      */
@@ -121,7 +123,7 @@ class UPSHelper
 
         // Shipment
         $shipment = new Shipment();
-        $shipment->setDescription($options['shipment_description'] ?? 'ISOTOPE COLLECTION ID "'.$collection->id.'"');
+        $shipment->setDescription($options['shipment_description'] ?? 'Isotope Collection ID "'.$collection->id.'"');
         $shipment->setShipper($shipper);
         $shipment->setShipTo($shipTo);
         $shipment->setShipFrom($shipFrom);
@@ -148,36 +150,55 @@ class UPSHelper
         $labelSpec->setLabelStockSize($labelStockSize);
         $labelSpec->setHttpUserAgent("Mozilla/4.5"); // optional
 
-        // Shipment Request
-        $shipmentRequest = new ShipmentRequest();
-        $shipmentRequest->setRequest(new Request);
-        $shipmentRequest->setShipment($shipment);
-        $shipmentRequest->setLabelSpecification($labelSpec);
+//        // Shipment Request
+//        $shipmentRequest = new ShipmentRequest();
+//        $shipmentRequest->setRequest(new Request);
+//        $shipmentRequest->setShipment($shipment);
+//        $shipmentRequest->setLabelSpecification($labelSpec);
+
+        // Rate Request
+        $rateRequest = new RateRequest();
+        $rateRequest->setRequest(new Request);
+        $rateRequest->setShipment($shipment);
 
         // Query - Double check the city
         $query = new ShipQuery(); // optional
         $query->setAdditionalAddressValidation('city'); // optional
 
         // Ship
-        $ship = new Ship();
-        $ship->setQuery($query); // optional
-        $ship->setShipmentRequest($shipmentRequest);
-        $ship->setOnlyLabel(false); // optional
-        $ship->setMode($shippingModel->rhyme_ups_mode); // Optional | only used for prod
+//        $ship = new Ship();
+//        $ship->setQuery($query); // optional
+//        $ship->setShipmentRequest($shipmentRequest);
+//        $ship->setOnlyLabel(false); // optional
+//        $ship->setMode($shippingModel->rhyme_ups_mode); // Optional | only used for prod
+
+        $rating = new Rating();
+        $rating->setQuery($query);
+        $rating->setRateRequest($rateRequest);
+        $rating->setMode($shippingModel->rhyme_ups_mode);
+
+        \dd($rating);
 
         // Allow for some customization
-        $preEvent = new PreProductCollectionRateEvent($collection, $shippingModel, $ship, $options);
+        $preEvent = new PreProductCollectionRateEvent($collection, $shippingModel, $rating, $options);
         $this->eventDispatcher->dispatch($preEvent, PreProductCollectionRateEvent::NAME);
 
         // Send
-        $response = $ship->createShipment(
+//        $response = $ship->createShipment(
+//            $shippingModel->rhyme_ups_client_id,
+//            $shippingModel->rhyme_ups_client_secret
+//        );
+        $response = $rating->getRate(
             $shippingModel->rhyme_ups_client_id,
             $shippingModel->rhyme_ups_client_secret
         );
 
+        \dd($response);
+
         // Allow for some customization
-        $postEvent = new PostProductCollectionRateEvent($collection, $shippingModel, $ship, $response, $options);
+        $postEvent = new PostProductCollectionRateEvent($collection, $shippingModel, $rating, $response, $options);
         $this->eventDispatcher->dispatch($postEvent, PostProductCollectionRateEvent::NAME);
+        $response = $postEvent->getResponse();
 
         // Check the response
         if (($response['status'] ?? null) !== 'success'
@@ -229,16 +250,16 @@ class UPSHelper
                 $packaging->setDescription($options['packaging_description'] ?? Packaging::CUSTOMER_SUPPLIED_PACKAGE); // Todo: allow for this to be set on a per-product basis
                 $package->setPackaging($packaging);
 
-//                // Dimensions can be optional
-//                $unitOfMeasurement = new UnitOfMeasurement();
-//                $unitOfMeasurement->setCode(UnitOfMeasurement::INCHES);
-//                $unitOfMeasurement->setDescription("Inches"); // optional
-//
-//                $dimensions = new Dimensions();
-//                $dimensions->setUnitOfMeasurement($unitOfMeasurement);
-//                $dimensions->setLength((string)(float)($arrDimensions[0] ?? 1.0));
-//                $dimensions->setWidth((string)(float)($arrDimensions[1] ?? 1.0));
-//                $dimensions->setHeight((string)(float)($arrDimensions[2] ?? 1.0));
+                // Dimensions can be optional
+                $dimUom = new UnitOfMeasurement();
+                $dimUom->setCode(UnitOfMeasurement::INCHES);
+                $dimUom->setDescription('Inches'); // optional
+
+                $dimensions = new Dimensions();
+                $dimensions->setUnitOfMeasurement($dimUom);
+                $dimensions->setLength((string)(float)($arrDimensions[0] ?? 1.0));
+                $dimensions->setWidth((string)(float)($arrDimensions[1] ?? 1.0));
+                $dimensions->setHeight((string)(float)($arrDimensions[2] ?? 1.0));
 
                 // Package weight can be optional
                 $weightUom = new UnitOfMeasurement();
@@ -255,7 +276,7 @@ class UPSHelper
                 $package = new Package();
                 $package->setDescription('Item ID '.$item->id.' ('.($i+1).' of '.$item->quantity.')'); // optional
                 $package->setPackaging($packaging);
-                //$package->setDimensions($dimensions); // optional
+                $package->setDimensions($dimensions); // optional
                 $package->setPackageWeight($packageWeight);
                 $package->setReferenceNumber($packageRef); //optional
 
@@ -421,7 +442,7 @@ class UPSHelper
         $shipTo->setPhone($phone);
         $shipTo->setEmail((string)$addressModel->email);
         $shipTo->setAddress($address);
-        $shipTo->setResidential($options['residential'] ?? '');
+        $shipTo->setResidential($options['residential'] ?? '1');
 
         return $shipTo;
     }
@@ -455,7 +476,7 @@ class UPSHelper
         $address->setCity((string)$objItem->city);
         $address->setStateProvinceCode(\count($subdivision) > 1 ? (string)$subdivision[1] : '');
         $address->setPostalCode((string)$objItem->postal);
-        $address->setCountryCode((string)$objItem->country);
+        $address->setCountryCode(\strtoupper((string)$objItem->country));
 
         return $address;
     }
