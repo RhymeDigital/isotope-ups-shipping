@@ -13,7 +13,7 @@ namespace Rhymedigital\IsotopeUpsShipping\Event;
 
 use Isotope\Interfaces\IsotopeOrderableCollection;
 use Isotope\Interfaces\IsotopeShipping;
-use RahulGodiyal\PhpUpsApiWrapper\Ship;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Rating;
 use Symfony\Contracts\EventDispatcher\Event;
 
 class PostProductCollectionRateEvent extends Event
@@ -22,15 +22,15 @@ class PostProductCollectionRateEvent extends Event
 
     protected IsotopeOrderableCollection $collection;
     protected IsotopeShipping $shipping;
-    protected Ship $ship;
+    protected Rating $rating;
     protected array $response;
     protected array $options;
 
-    public function __construct(IsotopeOrderableCollection $collection, IsotopeShipping $shipping, Ship $ship, array $response, array $options=[])
+    public function __construct(IsotopeOrderableCollection $collection, IsotopeShipping $shipping, Rating $rating, array $response, array $options=[])
     {
         $this->collection = $collection;
         $this->shipping = $shipping;
-        $this->ship = $ship;
+        $this->rating = $rating;
         $this->response = $response;
         $this->options = $options;
     }
@@ -55,14 +55,14 @@ class PostProductCollectionRateEvent extends Event
         $this->shipping = $shipping;
     }
 
-    public function getShip(): Ship
+    public function getRating(): Rating
     {
         return $this->ship;
     }
 
-    public function setShip(Ship $ship): void
+    public function setRating(Rating $rating): void
     {
-        $this->ship = $ship;
+        $this->rating = $rating;
     }
 
     public function getResponse(): array

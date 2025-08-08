@@ -12,12 +12,14 @@
   </component>
   <component name="PhpIncludePathManager">
     <include_path>
+      <path value="$PROJECT_DIR$/../isotope_advancedshipping" />
+      <path value="$USER_HOME$/GIT/symfony-6.4/event-dispatcher-contracts" />
+      <path value="$USER_HOME$/GIT/php-ups-api-wrapper" />
       <path value="$USER_HOME$/GIT/symfony-5.4" />
       <path value="$USER_HOME$/GIT/contao-bundles-4.10/manager-plugin" />
       <path value="$USER_HOME$/GIT/contao-bundles-4.13" />
       <path value="$USER_HOME$/GIT/isotope-2024" />
       <path value="$USER_HOME$/GIT/contao-haste" />
-      <path value="$USER_HOME$/GIT/gabrielbull-php-ups-api" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="7.4" />
