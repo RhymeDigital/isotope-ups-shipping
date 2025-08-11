@@ -49,12 +49,13 @@ use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipQuery;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipTo;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\UnitOfMeasurement;
 use RahulGodiyal\PhpUpsApiWrapper\Ship;
-use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\Packages;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RatingPackages;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequest;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Rating;
 use Rhymedigital\IsotopeUpsShipping\Event\PostProductCollectionRateEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionRateEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\ValidateProductCollectionRateEvent;
+use Rhymedigital\IsotopeUpsShipping\Session\ApiResponseCache;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class UPSHelper
@@ -65,8 +66,18 @@ class UPSHelper
      */
     private EventDispatcherInterface $eventDispatcher;
 
-    public function __construct(EventDispatcherInterface $eventDispatcher) {
+    /**
+     * @var ApiResponseCache
+     */
+    private ApiResponseCache $apiResponseCache;
+
+    /**
+     * @param EventDispatcherInterface $eventDispatcher
+     * @param ApiResponseCache         $apiResponseCache
+     */
+    public function __construct(EventDispatcherInterface $eventDispatcher, ApiResponseCache $apiResponseCache) {
         $this->eventDispatcher = $eventDispatcher;
+        $this->apiResponseCache = $apiResponseCache;
     }
 
     /**
@@ -76,144 +87,150 @@ class UPSHelper
      * @param IsotopeOrderableCollection|null $collection    The orderable collection to calculate the shipping rate for. Defaults to the current cart if null.
      * @param IsotopeShipping|null            $shippingModel The specific shipping method to calculate the rate with. Defaults to the collection's shipping method if null.
      * @param array                           $options       Additional options or configuration for determining the rate.
-     * @return float|null The calculated shipping rate as a float if successful, or null if the operation fails.
+     * @return array|null The calculated shipping rate as a float if successful, or null if the operation fails.
      * @throws Exception
      */
-    public function getRateForCollection(?IsotopeOrderableCollection $collection=null, ?IsotopeShipping $shippingModel=null, array $options=[]): ?float
+    public function getRatesForCollection(?IsotopeOrderableCollection $collection=null, ?IsotopeShipping $shippingModel=null, array $options=[]): array
     {
-        $fltRate = 0.0;
         $collection = $collection ?? Isotope::getCart();
 
         // Allow for some customization
         $validateEvent = new ValidateProductCollectionRateEvent($collection, $shippingModel, $options);
         $this->eventDispatcher->dispatch($validateEvent, ValidateProductCollectionRateEvent::NAME);
+        $collection = $validateEvent->getCollection();
 
-        // Ensure we have all of the objects we need in order to build the shipment and get a rate
-        if (($collection = $validateEvent->getCollection()) === null
-            || ($shippingModel = $validateEvent->getShipping()) === null
-            || ($shipAddressModel = $collection->getShippingAddress() ?? $collection->getBillingAddress()) === null
-            || ($configModel = $collection->getConfig() ?? Isotope::getConfig()) === null
-            || ($shipper = $this->getShipperForStoreConfig($configModel)) === null
-            || ($shipTo = $this->getShipToForAddress($shipAddressModel)) === null
-            || ($shipFrom = $this->getShipFromForStoreConfig($configModel)) === null
-        ) {
-            return null;
+        $cacheKey = static::makeHash($collection, $options['hash_extras'] ?? null);
+
+        if (!$this->apiResponseCache->has($cacheKey)) {
+
+            // Ensure we have all of the objects we need in order to build the shipment and get a rate
+            if (($collection = $validateEvent->getCollection()) === null
+                || ($shippingModel = $validateEvent->getShipping()) === null
+                || ($shipAddressModel = $collection->getShippingAddress() ?? $collection->getBillingAddress()) === null
+                || ($configModel = $collection->getConfig() ?? Isotope::getConfig()) === null
+                || ($shipper = $this->getShipperForStoreConfig($configModel)) === null
+                || ($shipTo = $this->getShipToForAddress($shipAddressModel)) === null
+                || ($shipFrom = $this->getShipFromForStoreConfig($configModel)) === null
+            ) {
+                return [];
+            }
+
+            $shipper->setShippingNumber($shippingModel->rhyme_ups_account_number ?? '');
+
+            // PaymentInformation
+            $billShipper = new BillShipper();
+            $billShipper->setAccountNumber($shippingModel->rhyme_ups_account_number ?? '');
+            $shipmentCharge = new ShipmentCharge();
+            $shipmentCharge->setBillShipper($billShipper);
+            $paymentInfo = new PaymentInformation();
+            $paymentInfo->setShipmentCharge($shipmentCharge);
+
+            // Service
+            Controller::loadLanguageFile(Shipping::getTable());
+            $service = new Service();
+            $service->setCode($shippingModel->rhyme_ups_enabled_service ?? '');
+            $service->setDescription($GLOBALS['TL_LANG'][Shipping::getTable()]['rhyme_ups_services'][$service->getCode()] ?? $service->getCode());
+
+            // Packages
+            if (($packages = $this->buildPackagesForCollection($collection)) === null) {
+                return [];
+            }
+
+            // Shipment
+            $shipment = new Shipment();
+            $shipment->setDescription($options['shipment_description'] ?? 'Isotope Collection ID "'.$collection->id.'"');
+            $shipment->setShipper($shipper);
+            $shipment->setShipTo($shipTo);
+            $shipment->setShipFrom($shipFrom);
+            $shipment->setPaymentInformation($paymentInfo);
+            $shipment->setService($service);
+            $shipment->setPackage($packages);
+
+            // ShippingRatingOptions
+            $ratingOptions = new ShippingRatingOptions(); // optional
+            $ratingOptions->setNegotiatedRatesIndicator(true); // optional
+            $shipment->setShippingRatingOptions($ratingOptions); // optional
+
+            // Label
+            $labelImageFormat = new LabelImageFormat();
+            $labelImageFormat->setCode(LabelImageFormat::GIF); // Todo: allow for this to be set on a per-product basis
+            $labelImageFormat->setDescription('GIF'); // optional
+
+            $labelStockSize = new LabelStockSize();
+            $labelStockSize->setHeight(LabelStockSize::H_8); // Todo: allow for this to be set on a per-product basis
+            $labelStockSize->setWidth(LabelStockSize::W_4); // Todo: allow for this to be set on a per-product basis
+
+            $labelSpec = new LabelSpecification();
+            $labelSpec->setLabelImageFormat($labelImageFormat);
+            $labelSpec->setLabelStockSize($labelStockSize);
+            $labelSpec->setHttpUserAgent('Mozilla/4.5'); // optional
+
+            // Rate Request
+            $rateRequest = new RateRequest();
+            $rateRequest->setRequest(new Request);
+            $rateRequest->setShipment($shipment);
+
+            // Query - Double check the city
+            $query = new ShipQuery(); // optional
+            $query->setAdditionalAddressValidation('city'); // optional
+
+            $rating = new Rating();
+            $rating->setQuery($query);
+            $rating->setRateRequest($rateRequest);
+            $rating->setMode($shippingModel->rhyme_ups_mode);
+
+            // Allow for some customization
+            $preEvent = new PreProductCollectionRateEvent($collection, $shippingModel, $rating, $options);
+            $this->eventDispatcher->dispatch($preEvent, PreProductCollectionRateEvent::NAME);
+
+            // Send
+            $response = $rating->getRate(
+                $shippingModel->rhyme_ups_client_id,
+                $shippingModel->rhyme_ups_client_secret
+            );
+
+            // Allow for some customization
+            $postEvent = new PostProductCollectionRateEvent($collection, $shippingModel, $rating, $response, $options);
+            $this->eventDispatcher->dispatch($postEvent, PostProductCollectionRateEvent::NAME);
+            $this->apiResponseCache->set($cacheKey, $postEvent->getResponse());
         }
 
-        $shipper->setShippingNumber($shippingModel->rhyme_ups_account_number ?? '');
-
-        // PaymentInformation
-        $billShipper = new BillShipper();
-        $billShipper->setAccountNumber($shippingModel->rhyme_ups_account_number ?? '');
-        $shipmentCharge = new ShipmentCharge();
-        $shipmentCharge->setBillShipper($billShipper);
-        $paymentInfo = new PaymentInformation();
-        $paymentInfo->setShipmentCharge($shipmentCharge);
-
-        // Service
-        Controller::loadLanguageFile(Shipping::getTable());
-        $service = new Service();
-        $service->setCode($shippingModel->rhyme_ups_enabled_service ?? '');
-        $service->setDescription($GLOBALS['TL_LANG'][Shipping::getTable()]['rhyme_ups_services'][$service->getCode()] ?? $service->getCode());
-
-        // Package
-        if (($packages = $this->buildPackagesForCollection($collection)) === null) {
-            return null;
-        }
-
-        // Shipment
-        $shipment = new Shipment();
-        $shipment->setDescription($options['shipment_description'] ?? 'Isotope Collection ID "'.$collection->id.'"');
-        $shipment->setShipper($shipper);
-        $shipment->setShipTo($shipTo);
-        $shipment->setShipFrom($shipFrom);
-        $shipment->setPaymentInformation($paymentInfo);
-        $shipment->setService($service);
-        $shipment->setPackage($packages);
-
-        // ShippingRatingOptions
-        $ratingOptions = new ShippingRatingOptions(); // optional
-        $ratingOptions->setNegotiatedRatesIndicator(true); // optional
-        $shipment->setShippingRatingOptions($ratingOptions); // optional
-
-        // Label
-        $labelImageFormat = new LabelImageFormat();
-        $labelImageFormat->setCode(LabelImageFormat::GIF); // Todo: allow for this to be set on a per-product basis
-        $labelImageFormat->setDescription('GIF'); // optional
-
-        $labelStockSize = new LabelStockSize();
-        $labelStockSize->setHeight(LabelStockSize::H_8); // Todo: allow for this to be set on a per-product basis
-        $labelStockSize->setWidth(LabelStockSize::W_4); // Todo: allow for this to be set on a per-product basis
-
-        $labelSpec = new LabelSpecification();
-        $labelSpec->setLabelImageFormat($labelImageFormat);
-        $labelSpec->setLabelStockSize($labelStockSize);
-        $labelSpec->setHttpUserAgent("Mozilla/4.5"); // optional
-
-//        // Shipment Request
-//        $shipmentRequest = new ShipmentRequest();
-//        $shipmentRequest->setRequest(new Request);
-//        $shipmentRequest->setShipment($shipment);
-//        $shipmentRequest->setLabelSpecification($labelSpec);
-
-        // Rate Request
-        $rateRequest = new RateRequest();
-        $rateRequest->setRequest(new Request);
-        $rateRequest->setShipment($shipment);
-
-        // Query - Double check the city
-        $query = new ShipQuery(); // optional
-        $query->setAdditionalAddressValidation('city'); // optional
-
-        // Ship
-//        $ship = new Ship();
-//        $ship->setQuery($query); // optional
-//        $ship->setShipmentRequest($shipmentRequest);
-//        $ship->setOnlyLabel(false); // optional
-//        $ship->setMode($shippingModel->rhyme_ups_mode); // Optional | only used for prod
-
-        $rating = new Rating();
-        $rating->setQuery($query);
-        $rating->setRateRequest($rateRequest);
-        $rating->setMode($shippingModel->rhyme_ups_mode);
-
-        \dd($rating);
-
-        // Allow for some customization
-        $preEvent = new PreProductCollectionRateEvent($collection, $shippingModel, $rating, $options);
-        $this->eventDispatcher->dispatch($preEvent, PreProductCollectionRateEvent::NAME);
-
-        // Send
-//        $response = $ship->createShipment(
-//            $shippingModel->rhyme_ups_client_id,
-//            $shippingModel->rhyme_ups_client_secret
-//        );
-        $response = $rating->getRate(
-            $shippingModel->rhyme_ups_client_id,
-            $shippingModel->rhyme_ups_client_secret
-        );
-
-        \dd($response);
-
-        // Allow for some customization
-        $postEvent = new PostProductCollectionRateEvent($collection, $shippingModel, $rating, $response, $options);
-        $this->eventDispatcher->dispatch($postEvent, PostProductCollectionRateEvent::NAME);
-        $response = $postEvent->getResponse();
+        $response = $this->apiResponseCache->get($cacheKey);
 
         // Check the response
         if (($response['status'] ?? null) !== 'success'
             || !($response['data'] ?? null)
-            || !isset($response['data']->ShipmentResponse->ShipmentResults->ShipmentCharges->TotalCharges->MonetaryValue)
+            || empty($response['data']->RateResponse->RatedShipment)
         ) {
-            return null;
+            return [];
         }
 
         try {
-            $fltRate = (float)$response['data']->ShipmentResponse->ShipmentResults->ShipmentCharges->TotalCharges->MonetaryValue;
+            return (array)$response['data']->RateResponse->RatedShipment;
         }
-        catch (\Exception $e) {}
+        catch (Exception $e) {}
 
-        return $fltRate;
+        return [];
+    }
+
+
+    /**
+     * @param string $serviceCode
+     * @param array  $rates
+     * @return float
+     */
+    public function getRateAmountForService(string $serviceCode, array $rates): float
+    {
+        $rate = 0.00;
+
+        foreach ($rates as $r) {
+            if ($r->Service->Code === $serviceCode) {
+                $rate = (float)$r->TotalCharges->MonetaryValue;
+                break;
+            }
+        }
+
+        return $rate;
     }
 
 
@@ -223,12 +240,12 @@ class UPSHelper
      * @param IsotopeProductCollection $collection The product collection for which packages are to be created.
      * @param Shipping|null            $shipping   The shipping method to use. Defaults to the collection's shipping method if null.
      * @param array                    $options    Additional options for package creation, such as packaging type or description.
-     * @return Packages|null A Packages object containing the created packages, or null if no packages were created.
+     * @return RatingPackages|null A Packages object containing the created packages, or null if no packages were created.
      * @throws Exception
      */
-    public function buildPackagesForCollection(IsotopeProductCollection $collection, ?Shipping $shipping=null, array $options=[]): ?Packages
+    public function buildPackagesForCollection(IsotopeProductCollection $collection, ?Shipping $shipping=null, array $options=[]): ?RatingPackages
     {
-        $packages = new Packages();
+        $packages = new RatingPackages();
         $shipping = $shipping ?? $collection->getShippingMethod();
 
         foreach ($collection->getItems() as $item) {
@@ -238,7 +255,7 @@ class UPSHelper
             }
 
             $product = $item->getProduct();
-            //$arrDimensions = StringUtil::deserialize($product->package_dimensions, true);
+            $arrDimensions = StringUtil::deserialize($product->package_dimensions, true);
             $package = new Package();
             $strWeight = (string)$this->getShippingWeightForCollectionItem($item, 'lb');
 
@@ -508,5 +525,41 @@ class UPSHelper
         }
 
         return (float)$objScale->amountIn($unit);
+    }
+
+
+    /**
+     * Build a Hash string based on the shipping address
+     *
+     * @param ?IsotopeProductCollection $objCollection
+     * @param null|array                $arrExtras
+     * @return string
+     */
+    public static function makeHash(?IsotopeProductCollection $objCollection = null, ?array $arrExtras=array()): string
+    {
+        $objCollection = $objCollection ?? Isotope::getCart();
+
+        $strBase = static::class;
+        $strBase .= !empty($arrExtras) ? \implode(',', $arrExtras) : '';
+
+        if (($address = $objCollection->getShippingAddress()) !== null) {
+            $strBase .= $address->street_1;
+            $strBase .= $address->street_2;
+            $strBase .= $address->street_3;
+            $strBase .= $address->city;
+            $strBase .= $address->subdivision;
+            $strBase .= $address->postal;
+            $strBase .= $address->country;
+        }
+
+        // Hash the cart too
+        foreach ($objCollection->getItems() as $item)
+        {
+            $strBase .= $item->quantity;
+            $strBase .= $item->id;
+            $strBase .= implode(',', $item->getOptions());
+        }
+
+        return \md5($strBase);
     }
 }

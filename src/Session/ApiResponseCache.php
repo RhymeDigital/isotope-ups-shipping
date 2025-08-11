@@ -9,14 +9,14 @@
 
 declare(strict_types=1);
 
-namespace Rhymedigital\IsotopeUpsShipping\Session\Attribute;
+namespace Rhymedigital\IsotopeUpsShipping\Session;
 
 use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBag;
 
 /**
  * Provides an array access adapter for a session attribute bag.
  */
-class ArrayAttributeBag extends AttributeBag implements \ArrayAccess
+class ApiResponseCache extends AttributeBag implements \ArrayAccess
 {
     public function offsetExists($offset): bool
     {
