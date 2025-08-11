@@ -12,11 +12,12 @@ declare(strict_types=1);
 namespace Rhymedigital\IsotopeUpsShipping\Model\Shipping;
 
 use Contao\System;
-use Contao\Cache;
 use Exception;
 use Isotope\Interfaces\IsotopeProductCollection;
 use Isotope\Isotope;
 use Isotope\Model\Shipping as Iso_Shipping;
+use Rhymedigital\IsotopeUpsShipping\Helper\UPSHelper;
+use Rhymedigital\IsotopeUpsShipping\Session\ApiResponseCache;
 
 class UPS extends Iso_Shipping
 {
@@ -30,7 +31,7 @@ class UPS extends Iso_Shipping
     public function isAvailable()
     {
         try {
-            if (parent::isAvailable() && $this->getLiveRateQuote() !== null) {
+            if (parent::isAvailable() && $this->getLiveRateQuote()) {
                 return true;
             }
         }
@@ -51,8 +52,7 @@ class UPS extends Iso_Shipping
         $fltPrice = parent::getPrice($objCollection);
 
         try {
-            $quote = $this->getLiveRateQuote($objCollection);
-            $fltPrice += $quote ?? 0.0;
+            $fltPrice += $this->getLiveRateQuote($objCollection);
         }
         catch (Exception $e) {
             // Todo: Add logging here!
@@ -65,59 +65,23 @@ class UPS extends Iso_Shipping
     /**
      * Return calculated price for this shipping method
      *
-     * @param ?IsotopeProductCollection $objCollection
+     * @param ?IsotopeProductCollection $collection
      * @return ?float
      * @throws Exception
      */
-    protected function getLiveRateQuote(?IsotopeProductCollection $objCollection = null): ?float
+    protected function getLiveRateQuote(?IsotopeProductCollection $collection = null): ?float
     {
-        $objCollection = $objCollection ?? Isotope::getCart();
+        $collection = $collection ?? Isotope::getCart();
 
-        // Get a hash for the cache
-        $strHash = static::makeHash($objCollection, array($this->rhyme_ups_enabled_service));
-
-        if (!Cache::has($strHash)) {
-            Cache::set($strHash, System::getContainer()->get('rhyme.isotope.ups_shipping.ups_helper')->getRateForCollection($objCollection, $this));
+        if (($helper = System::getContainer()->get('rhyme.isotope.ups_shipping.ups_helper')) !== null) {
+            return (float)$helper->getRateAmountForService(
+                $this->rhyme_ups_enabled_service,
+                $helper->getRatesForCollection($collection, $this)
+            );
         }
 
-        return Cache::get($strHash);
+        return 0.0;
     }
-
-
-    /**
-     * Build a Hash string based on the shipping address
-     *
-     * @param ?IsotopeProductCollection $objCollection
-     * @param null|array                $arrExtras
-     * @return string
-     */
-     protected static function makeHash(?IsotopeProductCollection $objCollection = null, ?array $arrExtras=array()): string
-     {
-         $objCollection = $objCollection ?? Isotope::getCart();
-
-         $strBase = static::class;
-         $strBase .= !empty($arrExtras) ? \implode(',', $arrExtras) : '';
-
-         if (($address = $objCollection->getShippingAddress()) !== null) {
-             $strBase .= $address->street_1;
-             $strBase .= $address->street_2;
-             $strBase .= $address->street_3;
-             $strBase .= $address->city;
-             $strBase .= $address->subdivision;
-             $strBase .= $address->postal;
-             $strBase .= $address->country;
-         }
-
-         // Hash the cart too
-         foreach ($objCollection->getItems() as $item)
-         {
-	         $strBase .= $item->quantity;
-	         $strBase .= $item->id;
-	         $strBase .= implode(',', $item->getOptions());
-         }
-
-         return \md5($strBase);
-     }
 
 }
 

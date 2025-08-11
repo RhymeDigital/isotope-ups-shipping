@@ -13,9 +13,9 @@ services:
         exclude: ../../{DependencyInjection,Resources,Model}
 
     # Add a session bag
-    Rhymedigital\IsotopeUpsShipping\Session\Attribute\ArrayAttributeBag:
+    Rhymedigital\IsotopeUpsShipping\Session\ApiResponseCache:
         arguments:
-            - _rhymedigital_isotope_ups_shipping_attributes
+            - _rhymedigital_isotope_ups_shipping_api_response_cache
         calls:
             - [ setName, [ rhymedigital_isotope_ups_shipping ] ]
 

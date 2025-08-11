@@ -27,6 +27,6 @@ class AddSessionBagsPass implements CompilerPassInterface
         }
 
         $session = $container->findDefinition('session');
-        $session->addMethodCall('registerBag', [new Reference('Rhymedigital\IsotopeUpsShipping\Session\Attribute\ArrayAttributeBag')]);
+        $session->addMethodCall('registerBag', [new Reference('Rhymedigital\IsotopeUpsShipping\Session\ApiResponseCache')]);
     }
 }

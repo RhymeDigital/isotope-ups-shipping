@@ -70,7 +70,7 @@ class Rating extends Auth
         $httpClient->setMethod("POST");
         $this->apiResponse = $res = $httpClient->fetch();
 
-        if (!isset($res->ShipmentResponse)) {
+        if (!isset($res->RateResponse)) {
             if (isset($res->response)) {
                 $error = $res->response->errors[0]->message;
             } else {
@@ -79,7 +79,7 @@ class Rating extends Auth
             return ['status' => 'fail', 'msg' => $error];
         }
 
-        if (!isset($res->ShipmentResponse->ShipmentResults)) {
+        if (!isset($res->RateResponse->RatedShipment)) {
             return ['status' => 'fail', 'msg' => "Invalid Request."];
         }
 
@@ -95,7 +95,7 @@ class Rating extends Auth
     public function getRequest(): string
     {
         return json_encode([
-            "RateRequest" => $this->rateRequest->toArray()
+            'RateRequest' => $this->rateRequest->toArray()
         ]);
     }
 
