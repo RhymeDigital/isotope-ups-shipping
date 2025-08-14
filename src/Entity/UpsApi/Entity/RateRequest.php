@@ -11,21 +11,20 @@ declare(strict_types=1);
 
 namespace Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity;
 
-use RahulGodiyal\PhpUpsApiWrapper\Entity\Request;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Shipment;
 
 class RateRequest
 {
-    private Request $request;
+    private RateRequestRequest $request;
     private Shipment $shipment;
 
-    public function setRequest(Request $request): self
+    public function setRequest(RateRequestRequest $request): self
     {
         $this->request = $request;
         return $this;
     }
 
-    public function getRequest(): Request
+    public function getRequest(): RateRequestRequest
     {
         return $this->request;
     }
@@ -44,8 +43,8 @@ class RateRequest
     public function toArray(): array
     {
         $rateRequest = [
-            "Request" => $this->request->toArray(),
-            "Shipment" => $this->shipment->toArray()
+            'Request' => $this->request->toArray(),
+            'Shipment' => $this->shipment->toArray()
         ];
 
         return $rateRequest;

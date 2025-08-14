@@ -57,7 +57,7 @@ class PostProductCollectionRateEvent extends Event
 
     public function getRating(): Rating
     {
-        return $this->ship;
+        return $this->rating;
     }
 
     public function setRating(Rating $rating): void

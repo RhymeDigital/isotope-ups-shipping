@@ -31,7 +31,8 @@ class Plugin implements BundlePluginInterface, RoutingPluginInterface
             BundleConfig::create(RhymedigitalIsotopeUpsShipping::class)
                 ->setLoadAfter([
                     ContaoCoreBundle::class,
-                    'isotope'
+                    'isotope',
+                    'isotope_advancedshipping',
                 ]),
         ];
     }

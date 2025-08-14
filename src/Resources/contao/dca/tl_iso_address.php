@@ -1,36 +1,44 @@
 <?php
 
 /**
- * UPS Integration for Isotope eCommerce for Contao Open Source CMS
+ *  Copyright (c) 2025 Rhyme Digital, LLC.
  *
- * Copyright (C) 2015 Rhyme Digital, LLC.
- *
- * @author		Blair Winans <blair@rhyme.digital>
- * @author		Adam Fisher <adam@rhyme.digital>
- * @link		http://rhyme.digital
- * @license		http://www.gnu.org/licenses/lgpl-3.0.html LGPL
+ *  @link			https://rhyme.digital
+ *  @license		https://www.gnu.org/licenses/lgpl-3.0.txt LGPL
  */
 
+declare(strict_types=1);
 
-/**
- * Palettes
- */
- $GLOBALS['TL_DCA']['tl_iso_address']['palettes']['default'] = str_replace('country','country,address_classification', $GLOBALS['TL_DCA']['tl_iso_address']['palettes']['default']);
+namespace {
+
+    use Contao\CoreBundle\DataContainer\PaletteManipulator;
+    use Isotope\Model\Address;
+
+    $t = Address::getTable();
+    $dca = &$GLOBALS['TL_DCA'][$t];
+
+    /**
+     * Palettes
+     */
+    PaletteManipulator::create()
+        ->addField('address_classification', 'country', PaletteManipulator::POSITION_AFTER)
+        ->applyToPalette('default', $t)
+    ;
 
 
-/**
- * Fields
- */
-$GLOBALS['TL_DCA']['tl_iso_address']['fields']['address_classification'] = array
-(
-	'label'					=> &$GLOBALS['TL_LANG']['tl_iso_address']['address_classification'],
-	'exclude'				=> true,
-	'filter'				=> true,
-	'sorting'				=> true,
-	'default'				=> 'residential',
-	'inputType'				=> 'select',
-	'options'				=> array('residential', 'business', 'unknown'),
-	'reference'				=> &$GLOBALS['TL_LANG']['tl_iso_address'],
-	'eval'					=> array('mandatory'=>true, 'feEditable'=>true, 'feGroup'=>'address', 'tl_class'=>'w50'),
-	'sql'                   => "varchar(64) NOT NULL default ''"
-);
+    /**
+     * Fields
+     */
+    $dca['fields']['address_classification'] = array
+    (
+        'exclude'				=> true,
+        'filter'				=> true,
+        'sorting'				=> true,
+        'default'				=> 'residential',
+        'inputType'				=> 'select',
+        'options'				=> array('residential', 'business'),
+        'reference'				=> &$GLOBALS['TL_LANG']['tl_iso_address']['address_classifications'],
+        'eval'					=> array('mandatory'=>true, 'feEditable'=>true, 'feGroup'=>'address', 'tl_class'=>'w50'),
+        'sql'                   => "varchar(64) NOT NULL default ''"
+    );
+}

@@ -2,19 +2,19 @@
 
 namespace Rhymedigital\IsotopeUpsShipping\Entity\UpsApi;
 
+use JsonException;
 use RahulGodiyal\PhpUpsApiWrapper\Auth;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipQuery;
-use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipmentRequest;
 use RahulGodiyal\PhpUpsApiWrapper\Utils\HttpClient;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequest;
 
 class Rating extends Auth
 {
-    private const VERSION = "v2403";
+    private const VERSION = 'v2403';
 
     private ShipQuery   $query;
     private RateRequest $rateRequest;
-    private object $apiResponse;
+    private object      $apiResponse;
 
     public function __construct()
     {
@@ -24,6 +24,7 @@ class Rating extends Auth
     public function setQuery(ShipQuery $query): self
     {
         $this->query = $query;
+
         return $this;
     }
 
@@ -35,6 +36,7 @@ class Rating extends Auth
     public function setRateRequest(RateRequest $rateRequest): self
     {
         $this->rateRequest = $rateRequest;
+
         return $this;
     }
 
@@ -43,7 +45,7 @@ class Rating extends Auth
         return $this->rateRequest;
     }
 
-    public function getRate(string $client_id, string $client_secret): array
+    public function getRate(string $client_id, string $client_secret, string $serviceCode = ''): array
     {
         $auth = $this->authenticate($client_id, $client_secret);
 
@@ -53,54 +55,69 @@ class Rating extends Auth
 
         $access_token = $auth['access_token'];
 
-        $queryParams = "";
+        $queryParams = '';
         if ($this->query->exists()) {
-            $queryParams = "?" . http_build_query($this->query->toArray());
+            $queryParams = '?'.http_build_query($this->query->toArray());
         }
 
         $httpClient = new HttpClient();
         $httpClient->setHeader([
-            "Authorization: Bearer $access_token",
-            "Content-Type: application/json",
-            "transId: string",
-            "transactionSrc: testing"
+            'Authorization: Bearer '.$access_token,
+            'Content-Type: application/json',
         ]);
         $httpClient->setPayload($this->getRequest());
-        $httpClient->setUrl($this->_getAPIBaseURL() . "/api/rating/" . self::VERSION . "/shop" . $queryParams); // Can also use "shop" instead of "rate"
-        $httpClient->setMethod("POST");
+        $httpClient->setUrl($this->_getAPIBaseURL().'/api/rating/'.self::VERSION.($serviceCode ? '/rate' : '/shop').$queryParams);
+        $httpClient->setMethod('POST');
         $this->apiResponse = $res = $httpClient->fetch();
 
         if (!isset($res->RateResponse)) {
             if (isset($res->response)) {
                 $error = $res->response->errors[0]->message;
-            } else {
-                $error = "Rating request failed! Please try again.";
             }
+            else {
+                $error = 'Rating request failed! Please try again.';
+            }
+
             return ['status' => 'fail', 'msg' => $error];
         }
 
         if (!isset($res->RateResponse->RatedShipment)) {
-            return ['status' => 'fail', 'msg' => "Invalid Request."];
+            return ['status' => 'fail', 'msg' => 'Invalid Request.'];
         }
 
         return ['status' => 'success', 'data' => $res];
     }
 
+    /**
+     * @param string $mode
+     * @return $this
+     */
     public function setMode(string $mode): self
     {
         parent::setMode($mode);
+
         return $this;
     }
 
+    /**
+     * @return string
+     * @throws \JsonException
+     */
     public function getRequest(): string
     {
-        return json_encode([
-            'RateRequest' => $this->rateRequest->toArray()
-        ]);
+        return \json_encode(
+            [
+                'RateRequest' => $this->rateRequest->toArray(),
+            ],
+            JSON_THROW_ON_ERROR
+        );
     }
 
+    /**
+     * @throws JsonException
+     */
     public function getResponse(): string
     {
-        return json_encode($this->apiResponse);
+        return json_encode($this->apiResponse, JSON_THROW_ON_ERROR);
     }
 }
