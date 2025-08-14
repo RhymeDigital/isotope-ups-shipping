@@ -27,7 +27,6 @@ use Isotope\Model\ProductCollectionItem;
 use Isotope\Model\Shipping;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Address;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\BillShipper;
-use RahulGodiyal\PhpUpsApiWrapper\Entity\Dimensions;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\LabelImageFormat;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\LabelSpecification;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\LabelStockSize;
@@ -36,7 +35,6 @@ use RahulGodiyal\PhpUpsApiWrapper\Entity\PackageWeight;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Packaging;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\PaymentInformation;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Phone;
-use RahulGodiyal\PhpUpsApiWrapper\Entity\ReferenceNumber;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Request;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\Service;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipFrom;
@@ -49,12 +47,17 @@ use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipQuery;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipTo;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\UnitOfMeasurement;
 use RahulGodiyal\PhpUpsApiWrapper\Ship;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequestRequest;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RatingPackages;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\Packages;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequest;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Rating;
 use Rhymedigital\IsotopeUpsShipping\Event\PostProductCollectionRateEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionRateEvent;
+use Rhymedigital\IsotopeUpsShipping\Event\PostProductCollectionShipmentEvent;
+use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionShipmentEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\ValidateProductCollectionRateEvent;
+use Rhymedigital\IsotopeUpsShipping\Event\ValidateProductCollectionShipmentEvent;
 use Rhymedigital\IsotopeUpsShipping\Session\ApiResponseCache;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -102,6 +105,7 @@ class UPSHelper
         $cacheKey = static::makeHash($collection, $options['hash_extras'] ?? null);
 
         if (!$this->apiResponseCache->has($cacheKey)) {
+            $this->apiResponseCache->clear();
 
             // Ensure we have all of the objects we need in order to build the shipment and get a rate
             if (($collection = $validateEvent->getCollection()) === null
@@ -126,19 +130,18 @@ class UPSHelper
             $paymentInfo->setShipmentCharge($shipmentCharge);
 
             // Service
-            Controller::loadLanguageFile(Shipping::getTable());
             $service = new Service();
             $service->setCode($shippingModel->rhyme_ups_enabled_service ?? '');
-            $service->setDescription($GLOBALS['TL_LANG'][Shipping::getTable()]['rhyme_ups_services'][$service->getCode()] ?? $service->getCode());
+            $service->setDescription($service->getCode());
 
             // Packages
-            if (($packages = $this->buildPackagesForCollection($collection)) === null) {
+            if (($packages = $this->buildRatingPackagesForCollection($collection)) === null) {
                 return [];
             }
 
             // Shipment
             $shipment = new Shipment();
-            $shipment->setDescription($options['shipment_description'] ?? 'Isotope Collection ID "'.$collection->id.'"');
+            $shipment->setDescription($options['shipment_description'] ?? $collection->id);
             $shipment->setShipper($shipper);
             $shipment->setShipTo($shipTo);
             $shipment->setShipFrom($shipFrom);
@@ -151,23 +154,13 @@ class UPSHelper
             $ratingOptions->setNegotiatedRatesIndicator(true); // optional
             $shipment->setShippingRatingOptions($ratingOptions); // optional
 
-            // Label
-            $labelImageFormat = new LabelImageFormat();
-            $labelImageFormat->setCode(LabelImageFormat::GIF); // Todo: allow for this to be set on a per-product basis
-            $labelImageFormat->setDescription('GIF'); // optional
-
-            $labelStockSize = new LabelStockSize();
-            $labelStockSize->setHeight(LabelStockSize::H_8); // Todo: allow for this to be set on a per-product basis
-            $labelStockSize->setWidth(LabelStockSize::W_4); // Todo: allow for this to be set on a per-product basis
-
-            $labelSpec = new LabelSpecification();
-            $labelSpec->setLabelImageFormat($labelImageFormat);
-            $labelSpec->setLabelStockSize($labelStockSize);
-            $labelSpec->setHttpUserAgent('Mozilla/4.5'); // optional
+            // Rate Request - Request
+            $request = new RateRequestRequest();
+            $request->setCustomerContext((string)$collection->id);
 
             // Rate Request
             $rateRequest = new RateRequest();
-            $rateRequest->setRequest(new Request);
+            $rateRequest->setRequest($request);
             $rateRequest->setShipment($shipment);
 
             // Query - Double check the city
@@ -197,6 +190,8 @@ class UPSHelper
 
         $response = $this->apiResponseCache->get($cacheKey);
 
+        //\dd($response);
+
         // Check the response
         if (($response['status'] ?? null) !== 'success'
             || !($response['data'] ?? null)
@@ -211,6 +206,127 @@ class UPSHelper
         catch (Exception $e) {}
 
         return [];
+    }
+
+    /**
+     * Creates a UPS shipment for a given collection using an optionally provided shipping method and options.
+     * If no collection or shipping method is provided, the method uses default values.
+     *
+     * @param IsotopeOrderableCollection|null $collection The orderable collection to calculate the shipping rate for. Defaults to the current cart if null.
+     * @param null|IsotopeShipping            $shippingModel
+     * @param array                           $options    Additional options or configuration for determining the rate.
+     * @return array|null The UPS response if successful, or null if the operation fails.
+     * @throws Exception
+     */
+    public function createShipmentForCollection(?IsotopeOrderableCollection $collection=null, ?IsotopeShipping $shippingModel=null, array $options=[]): ?array
+    {
+        $collection = $collection ?? Isotope::getCart();
+
+        // Allow for some customization
+        $validateEvent = new ValidateProductCollectionShipmentEvent($collection, $shippingModel, $options);
+        $this->eventDispatcher->dispatch($validateEvent, ValidateProductCollectionShipmentEvent::NAME);
+
+        // Ensure we have all of the objects we need in order to build the shipment and get a rate
+        if (($collection = $validateEvent->getCollection()) === null
+            || ($shippingModel = $validateEvent->getShipping()) === null
+            || ($shipAddressModel = $collection->getShippingAddress() ?? $collection->getBillingAddress()) === null
+            || ($configModel = $collection->getConfig() ?? Isotope::getConfig()) === null
+            || ($shipper = $this->getShipperForStoreConfig($configModel)) === null
+            || ($shipTo = $this->getShipToForAddress($shipAddressModel)) === null
+            || ($shipFrom = $this->getShipFromForStoreConfig($configModel)) === null
+        ) {
+            return null;
+        }
+
+        $shipper->setShippingNumber($shippingModel->rhyme_ups_account_number ?? '');
+
+        // PaymentInformation
+        $billShipper = new BillShipper();
+        $billShipper->setAccountNumber($shippingModel->rhyme_ups_account_number ?? '');
+        $shipmentCharge = new ShipmentCharge();
+        $shipmentCharge->setBillShipper($billShipper);
+        $paymentInfo = new PaymentInformation();
+        $paymentInfo->setShipmentCharge($shipmentCharge);
+
+        // Service
+        $service = new Service();
+        $service->setCode($shippingModel->rhyme_ups_enabled_service ?? '');
+        $service->setDescription($service->getCode());
+
+        // Package
+        if (($packages = $this->buildShippingPackagesForCollection($collection)) === null) {
+            return null;
+        }
+
+        // Shipment
+        $shipment = new Shipment();
+        $shipment->setDescription($options['shipment_description'] ?? $collection->id);
+        $shipment->setShipper($shipper);
+        $shipment->setShipTo($shipTo);
+        $shipment->setShipFrom($shipFrom);
+        $shipment->setPaymentInformation($paymentInfo);
+        $shipment->setService($service);
+        $shipment->setPackage($packages);
+
+        // ShippingRatingOptions
+        $ratingOptions = new ShippingRatingOptions(); // optional
+        $ratingOptions->setNegotiatedRatesIndicator(true); // optional
+        $shipment->setShippingRatingOptions($ratingOptions); // optional
+
+        // Label
+        $labelImageFormat = new LabelImageFormat();
+        $labelImageFormat->setCode(LabelImageFormat::GIF); // Todo: allow for this to be set on a per-product basis
+        $labelImageFormat->setDescription('GIF'); // optional
+
+        $labelStockSize = new LabelStockSize();
+        $labelStockSize->setHeight(LabelStockSize::H_8); // Todo: allow for this to be set on a per-product basis
+        $labelStockSize->setWidth(LabelStockSize::W_4); // Todo: allow for this to be set on a per-product basis
+
+        $labelSpec = new LabelSpecification();
+        $labelSpec->setLabelImageFormat($labelImageFormat);
+        $labelSpec->setLabelStockSize($labelStockSize);
+        $labelSpec->setHttpUserAgent("Mozilla/4.5"); // optional
+
+        // Shipment Request
+        $shipmentRequest = new ShipmentRequest();
+        $shipmentRequest->setRequest(new Request);
+        $shipmentRequest->setShipment($shipment);
+        $shipmentRequest->setLabelSpecification($labelSpec);
+
+        // Query - Double check the city
+        $query = new ShipQuery(); // optional
+        $query->setAdditionalAddressValidation('city'); // optional
+
+        // Ship
+        $ship = new Ship();
+        $ship->setQuery($query); // optional
+        $ship->setShipmentRequest($shipmentRequest);
+        $ship->setOnlyLabel(false); // optional
+        $ship->setMode($shippingModel->rhyme_ups_mode); // Optional | only used for prod
+
+        // Allow for some customization
+        $preEvent = new PreProductCollectionShipmentEvent($collection, $shippingModel, $ship, $options);
+        $this->eventDispatcher->dispatch($preEvent, PreProductCollectionShipmentEvent::NAME);
+
+        // Send
+        $response = $ship->createShipment(
+            $shippingModel->rhyme_ups_client_id,
+            $shippingModel->rhyme_ups_client_secret
+        );
+
+        // Allow for some customization
+        $postEvent = new PostProductCollectionShipmentEvent($collection, $shippingModel, $ship, $response, $options);
+        $this->eventDispatcher->dispatch($postEvent, PostProductCollectionShipmentEvent::NAME);
+
+        // Check the response
+        if (($response['status'] ?? null) !== 'success'
+            || !($response['data'] ?? null)
+            || !isset($response['data']->ShipmentResponse->ShipmentResults)
+        ) {
+            return null;
+        }
+
+        return $response;
     }
 
 
@@ -243,9 +359,12 @@ class UPSHelper
      * @return RatingPackages|null A Packages object containing the created packages, or null if no packages were created.
      * @throws Exception
      */
-    public function buildPackagesForCollection(IsotopeProductCollection $collection, ?Shipping $shipping=null, array $options=[]): ?RatingPackages
+    public function buildRatingPackagesForCollection(IsotopeProductCollection $collection, ?Shipping $shipping=null, array $options=[]): ?RatingPackages
     {
+        $package = new Package();
         $packages = new RatingPackages();
+
+        $fltPackageWeight = 0.0;
         $shipping = $shipping ?? $collection->getShippingMethod();
 
         foreach ($collection->getItems() as $item) {
@@ -255,53 +374,122 @@ class UPSHelper
             }
 
             $product = $item->getProduct();
-            $arrDimensions = StringUtil::deserialize($product->package_dimensions, true);
-            $package = new Package();
-            $strWeight = (string)$this->getShippingWeightForCollectionItem($item, 'lb');
+            //$arrDimensions = StringUtil::deserialize($product->package_dimensions, true);
+            $fltItemWeight = $this->getShippingWeightForCollectionItem($item, 'lb');
 
             for ($i = 0; $i < $item->quantity; $i++) {
 
-                // Packaging
-                $packaging = new Packaging();
-                $packaging->setCode($options['packaging_type'] ?? Packaging::CUSTOMER_SUPPLIED_PACKAGE); // Todo: allow for this to be set on a per-product basis
-                $packaging->setDescription($options['packaging_description'] ?? Packaging::CUSTOMER_SUPPLIED_PACKAGE); // Todo: allow for this to be set on a per-product basis
-                $package->setPackaging($packaging);
+                // If an item weighs more than 150 lbs, it needs to ship via UPS Freight
+                if ($fltItemWeight >= 150) {
+                    return null;
+                }
 
-                // Dimensions can be optional
-                $dimUom = new UnitOfMeasurement();
-                $dimUom->setCode(UnitOfMeasurement::INCHES);
-                $dimUom->setDescription('Inches'); // optional
+                // If the package would be over 150 lbs after adding this item, start a new one
+                if ($fltPackageWeight + $fltItemWeight >= 150)
+                {
+                    $packages->addPackage($package);
+                    $package = new Package();
+                    $fltPackageWeight = 0;
+                }
 
-                $dimensions = new Dimensions();
-                $dimensions->setUnitOfMeasurement($dimUom);
-                $dimensions->setLength((string)(float)($arrDimensions[0] ?? 1.0));
-                $dimensions->setWidth((string)(float)($arrDimensions[1] ?? 1.0));
-                $dimensions->setHeight((string)(float)($arrDimensions[2] ?? 1.0));
+                $fltPackageWeight += $fltItemWeight;
 
-                // Package weight can be optional
-                $weightUom = new UnitOfMeasurement();
-                $weightUom->setCode(UnitOfMeasurement::POUNDS);
-                $weightUom->setDescription(UnitOfMeasurement::POUNDS); // optional
-
-                $packageWeight = new PackageWeight();
-                $packageWeight->setUnitOfMeasurement($weightUom);
-                $packageWeight->setWeight($strWeight);
-
-                $packageRef = new ReferenceNumber(); // optional
-                $packageRef->setValue('Item ID '.$item->id.' ('.($i+1).' of '.$item->quantity.')'); // optional
-
-                $package = new Package();
-                $package->setDescription('Item ID '.$item->id.' ('.($i+1).' of '.$item->quantity.')'); // optional
-                $package->setPackaging($packaging);
-                $package->setDimensions($dimensions); // optional
-                $package->setPackageWeight($packageWeight);
-                $package->setReferenceNumber($packageRef); //optional
-
-                $packages->addPackage($package);
+                $this->setPackagingAndWeightForPackage($package, $fltPackageWeight);
             }
         }
 
+        // If there is weight left over, a package hasn't been added to the collection so add it
+        if ($fltPackageWeight) {
+            $packages->addPackage($package);
+        }
+
         return $packages->hasPackages() ? $packages : null;
+    }
+
+
+    /**
+     * Creates packages for a given product collection based on its items, optionally using a specified shipping method and other configuration options.
+     *
+     * @param IsotopeProductCollection $collection The product collection for which packages are to be created.
+     * @param Shipping|null            $shipping   The shipping method to use. Defaults to the collection's shipping method if null.
+     * @param array                    $options    Additional options for package creation, such as packaging type or description.
+     * @return Packages|null A Packages object containing the created packages, or null if no packages were created.
+     * @throws Exception
+     */
+    public function buildShippingPackagesForCollection(IsotopeProductCollection $collection, ?Shipping $shipping=null, array $options=[]): ?Packages
+    {
+        $package = new Package();
+        $packages = new Packages();
+
+        $fltPackageWeight = 0.0;
+        $shipping = $shipping ?? $collection->getShippingMethod();
+
+        foreach ($collection->getItems() as $item) {
+
+            if (!$item->hasProduct()) {
+                continue;
+            }
+
+            $product = $item->getProduct();
+            //$arrDimensions = StringUtil::deserialize($product->package_dimensions, true);
+            $fltItemWeight = $this->getShippingWeightForCollectionItem($item, 'lb');
+
+            for ($i = 0; $i < $item->quantity; $i++) {
+
+                // If an item weighs more than 150 lbs, it needs to ship via UPS Freight
+                if ($fltItemWeight >= 150) {
+                    return null;
+                }
+
+                // If the package would be over 150 lbs after adding this item, start a new one
+                if ($fltPackageWeight + $fltItemWeight >= 150)
+                {
+                    $packages->addPackage($package);
+                    $package = new Package();
+                    $fltPackageWeight = 0;
+                }
+
+                $fltPackageWeight += $fltItemWeight;
+
+                $this->setPackagingAndWeightForPackage($package, $fltPackageWeight);
+            }
+        }
+
+        // If there is weight left over, a package hasn't been added to the collection so add it
+        if ($fltPackageWeight) {
+            $packages->addPackage($package);
+        }
+
+        return $packages->hasPackages() ? $packages : null;
+    }
+
+
+    /**
+     * @param Package     $package
+     * @param float       $weight
+     * @param null|string $description
+     * @param null|string $code
+     * @return Package
+     * @throws Exception
+     */
+    public function setPackagingAndWeightForPackage(Package $package, float $weight, ?string $description=null, ?string $code=null): Package
+    {
+        $packaging = new Packaging();
+        $packaging->setCode($code ?? Packaging::CUSTOMER_SUPPLIED_PACKAGE);
+        $packaging->setDescription($description ?? Packaging::CUSTOMER_SUPPLIED_PACKAGE);
+
+        $weightUom = new UnitOfMeasurement();
+        $weightUom->setCode(UnitOfMeasurement::POUNDS);
+        $weightUom->setDescription(UnitOfMeasurement::POUNDS); // optional
+
+        $packageWeight = new PackageWeight();
+        $packageWeight->setUnitOfMeasurement($weightUom);
+        $packageWeight->setWeight((string)$weight);
+
+        $package->setPackaging($packaging);
+        $package->setPackageWeight($packageWeight);
+
+        return $package;
     }
 
 
@@ -538,9 +726,11 @@ class UPSHelper
     public static function makeHash(?IsotopeProductCollection $objCollection = null, ?array $arrExtras=array()): string
     {
         $objCollection = $objCollection ?? Isotope::getCart();
+        $shippingMethod = $objCollection->getShippingMethod();
 
         $strBase = static::class;
         $strBase .= !empty($arrExtras) ? \implode(',', $arrExtras) : '';
+        $strBase .= $shippingMethod !== null ? \implode('|', $shippingMethod->row()) : '';
 
         if (($address = $objCollection->getShippingAddress()) !== null) {
             $strBase .= $address->street_1;

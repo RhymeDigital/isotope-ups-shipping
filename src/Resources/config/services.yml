@@ -18,6 +18,7 @@ services:
             - _rhymedigital_isotope_ups_shipping_api_response_cache
         calls:
             - [ setName, [ rhymedigital_isotope_ups_shipping ] ]
+        public: true
 
     rhyme.isotope.ups_shipping.ups_helper:
         class: Rhymedigital\IsotopeUpsShipping\Helper\UpsHelper

@@ -60,14 +60,7 @@ namespace {
         'rhyme_ups_enabled_service' => [
             'exclude'                 => true,
             'inputType'               => 'select',
-            'options'                 => $GLOBALS['TL_LANG']['tl_iso_shipping']['rhyme_ups_services'],
-            'eval'                    => ['mandatory' => true, 'tl_class' => 'w50'],
-            'sql'                     => "varchar(255) NOT NULL default ''"
-        ],
-        'rhyme_ups_packaging' => [
-            'exclude'                 => true,
-            'inputType'               => 'select',
-            'options'                 => $GLOBALS['TL_LANG']['tl_iso_shipping']['rhyme_ups_packaging'],
+            'options'                 => $GLOBALS['TL_LANG']['MSC']['rhyme_ups_services'],
             'eval'                    => ['mandatory' => true, 'tl_class' => 'w50'],
             'sql'                     => "varchar(255) NOT NULL default ''"
         ],
