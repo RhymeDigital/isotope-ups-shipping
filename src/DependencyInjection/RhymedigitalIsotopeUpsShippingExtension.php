@@ -15,7 +15,6 @@ use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
-use Rhymedigital\IsotopeUpsShipping\DependencyInjection\Configuration;
 
 /**
  * Class RhymedigitalIsotopeUpsShippingExtension
@@ -36,7 +35,6 @@ class RhymedigitalIsotopeUpsShippingExtension extends Extension
      */
     public function load(array $configs, ContainerBuilder $container): void
     {
-
         $configuration = new Configuration();
 
         $config = $this->processConfiguration($configuration, $configs);
@@ -49,10 +47,5 @@ class RhymedigitalIsotopeUpsShippingExtension extends Extension
         $loader->load('parameters.yml');
         $loader->load('services.yml');
         $loader->load('listener.yml');
-
-
-        $rootKey = $this->getAlias();
-
-        $container->setParameter($rootKey.'.foo.bar', $config['foo']['bar']);
     }
 }

@@ -174,7 +174,10 @@ class UPS extends Iso_Shipping
                     }
                 }
             }
-            catch (Exception $e) {}
+            catch (Exception $e) {
+                $message = 'UPS shipment purchase error: ' . (\method_exists($e,'getResponse') ? $e->getResponse()->getContent() : (\method_exists($e,'getMessage') ? $e->getMessage() : ((string)$e)));
+                System::log($message, __METHOD__, \TL_ERROR);
+            }
         }
 
         return $shipment;
