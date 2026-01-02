@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace Rhymedigital\IsotopeUpsShipping\Helper;
 
-use Contao\Controller;
 use Contao\StringUtil;
 use Exception;
 use Haste\Units\Mass\Scale;
@@ -46,16 +45,20 @@ use RahulGodiyal\PhpUpsApiWrapper\Entity\ShippingRatingOptions;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipQuery;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\ShipTo;
 use RahulGodiyal\PhpUpsApiWrapper\Entity\UnitOfMeasurement;
+use RahulGodiyal\PhpUpsApiWrapper\Entity\VoidShipmentQuery;
 use RahulGodiyal\PhpUpsApiWrapper\Ship;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequestRequest;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RatingPackages;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\Packages;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Entity\RateRequest;
 use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\Rating;
+use Rhymedigital\IsotopeUpsShipping\Entity\UpsApi\VoidShipment;
 use Rhymedigital\IsotopeUpsShipping\Event\PostProductCollectionRateEvent;
+use Rhymedigital\IsotopeUpsShipping\Event\PostVoidShipmentEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionRateEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\PostProductCollectionShipmentEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\PreProductCollectionShipmentEvent;
+use Rhymedigital\IsotopeUpsShipping\Event\PreVoidShipmentEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\ValidateProductCollectionRateEvent;
 use Rhymedigital\IsotopeUpsShipping\Event\ValidateProductCollectionShipmentEvent;
 use Rhymedigital\IsotopeUpsShipping\Session\ApiResponseCache;
@@ -190,8 +193,6 @@ class UPSHelper
 
         $response = $this->apiResponseCache->get($cacheKey);
 
-        //\dd($response);
-
         // Check the response
         if (($response['status'] ?? null) !== 'success'
             || !($response['data'] ?? null)
@@ -215,7 +216,7 @@ class UPSHelper
      * @param IsotopeOrderableCollection|null $collection The orderable collection to calculate the shipping rate for. Defaults to the current cart if null.
      * @param null|IsotopeShipping            $shippingModel
      * @param array                           $options    Additional options or configuration for determining the rate.
-     * @return array|null The UPS response if successful, or null if the operation fails.
+     * @return array|null The response if successful, or null if the operation fails.
      * @throws Exception
      */
     public function createShipmentForCollection(?IsotopeOrderableCollection $collection=null, ?IsotopeShipping $shippingModel=null, array $options=[]): ?array
@@ -308,6 +309,16 @@ class UPSHelper
         $preEvent = new PreProductCollectionShipmentEvent($collection, $shippingModel, $ship, $options);
         $this->eventDispatcher->dispatch($preEvent, PreProductCollectionShipmentEvent::NAME);
 
+        $fnDump = function($var){
+            ob_start();
+            var_dump($var);
+            $result = ob_get_clean();
+            return $result;
+        };
+        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
+        log_message($fnDump($ship), 'adam-'.\date('Y-m-d').'.log');
+        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
+
         // Send
         $response = $ship->createShipment(
             $shippingModel->rhyme_ups_client_id,
@@ -317,14 +328,6 @@ class UPSHelper
         // Allow for some customization
         $postEvent = new PostProductCollectionShipmentEvent($collection, $shippingModel, $ship, $response, $options);
         $this->eventDispatcher->dispatch($postEvent, PostProductCollectionShipmentEvent::NAME);
-
-        // Check the response
-        if (($response['status'] ?? null) !== 'success'
-            || !($response['data'] ?? null)
-            || !isset($response['data']->ShipmentResponse->ShipmentResults)
-        ) {
-            return null;
-        }
 
         return $response;
     }
@@ -751,5 +754,33 @@ class UPSHelper
         }
 
         return \md5($strBase);
+    }
+
+
+    public function voidShipment(string $shipmentIdentificationNumber, string $clientId, string $clientSecret, bool $debug=false, string $trackingNumber='', array $options=[]): ?array
+    {
+        // VoidShipmentQuery
+        $query = new VoidShipmentQuery(); // optional
+        $query->setTrackingNumber($trackingNumber); // optional
+
+        // VoidShipment
+        $voidShipment = new VoidShipment();
+        $voidShipment
+            ->setQuery($query) // optional
+            ->setShipmentIdentificationNumber($shipmentIdentificationNumber)
+            ->setMode($debug ? 'DEV' : 'PROD');
+
+        // Allow for some customization
+        $preEvent = new PreVoidShipmentEvent($voidShipment, $options);
+        $this->eventDispatcher->dispatch($preEvent, PreVoidShipmentEvent::NAME);
+
+        // Send
+        $response = $voidShipment->voidShipment($clientId, $clientSecret);
+
+        // Allow for some customization
+        $postEvent = new PostVoidShipmentEvent($voidShipment, $response, $options);
+        $this->eventDispatcher->dispatch($postEvent, PostVoidShipmentEvent::NAME);
+
+        return $response;
     }
 }

@@ -17,8 +17,9 @@ use Isotope\Interfaces\IsotopeProductCollection;
 use Isotope\Isotope;
 use Isotope\Model\Shipping as Iso_Shipping;
 use Rhymedigital\IsotopeUpsShipping\Helper\UPSHelper;
+use Rhymedigital\IsotopeUpsShipping\Interfaces\UPSShipping;
 
-class UPS extends Iso_Shipping
+class UPS extends Iso_Shipping implements UPSShipping
 {
 
     /**
@@ -37,7 +38,7 @@ class UPS extends Iso_Shipping
         catch (Exception $e) {
             System::getContainer()
                   ->get('monolog.logger.contao.error')
-                  ->error('UPS shipping error: ' . (\method_exists($e, 'getResponse') ? (string)$e->getResponse() : $e->getMessage()))
+                  ->error(\sprintf($GLOBALS['TL_LANG']['ERR']['upsShipping'], (\method_exists($e, 'getResponse') ? (string)$e->getResponse() : $e->getMessage())))
             ;
         }
 
@@ -59,7 +60,7 @@ class UPS extends Iso_Shipping
         catch (Exception $e) {
             System::getContainer()
                   ->get('monolog.logger.contao.error')
-                  ->error('UPS shipping error: ' . (\method_exists($e, 'getResponse') ? (string)$e->getResponse() : $e->getMessage()))
+                  ->error(\sprintf($GLOBALS['TL_LANG']['ERR']['upsShipping'], (\method_exists($e, 'getResponse') ? (string)$e->getResponse() : $e->getMessage())))
             ;
         }
 
@@ -118,6 +119,14 @@ class UPS extends Iso_Shipping
      */
     public function purchaseShipment($shipment)
     {
+        $fnDump = function($var){
+            ob_start();
+            var_dump($var);
+            $result = ob_get_clean();
+            return $result;
+        };
+        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
+        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
         if (($shipment ?? null) !== null
             && \method_exists($shipment, 'getCollection')
             && ($collection = $shipment->getCollection()) instanceof IsotopeProductCollection
@@ -126,6 +135,17 @@ class UPS extends Iso_Shipping
                 /** @var UPSHelper $helper */
                 if (($helper = System::getContainer()->get('rhyme.isotope.ups_shipping.ups_helper')) !== null) {
                     if (($response = $helper->createShipmentForCollection($collection)) !== null) {
+
+                        // Check the response
+                        if (($response['status'] ?? null) !== 'success') {
+                            throw new Exception(\sprintf('Could not purchase UPS shipment for Isotope shipment ID %s.%s', $shipment->id, ($response['msg'] ?? '')));
+                        }
+
+                        if (empty($response['data'] ?? null)
+                            || !isset($response['data']->ShipmentResponse->ShipmentResults)
+                        ) {
+                            throw new Exception(\sprintf('Could not purchase UPS shipment for Isotope shipment ID %s.', $shipment->id));
+                        }
 
                         // Success! Store the data for the shipment and the packages
                         $results = $response['data']->ShipmentResponse->ShipmentResults;
@@ -172,10 +192,13 @@ class UPS extends Iso_Shipping
                             }
                         }
                     }
+                    else {
+                        throw new Exception('Could not purchase UPS shipment for Isotope shipment ID ' . $shipment->id);
+                    }
                 }
             }
             catch (Exception $e) {
-                $message = 'UPS shipment purchase error: ' . (\method_exists($e,'getResponse') ? $e->getResponse()->getContent() : (\method_exists($e,'getMessage') ? $e->getMessage() : ((string)$e)));
+                $message = \sprintf($GLOBALS['TL_LANG']['ERR']['upsShipmentPurchase'], (\method_exists($e,'getResponse') ? $e->getResponse()->getContent() : (\method_exists($e,'getMessage') ? $e->getMessage() : ((string)$e))));
                 System::log($message, __METHOD__, \TL_ERROR);
             }
         }

@@ -25,6 +25,7 @@ namespace {
         PaletteManipulator::create()
             ->addLegend('ups_legend', 'details_legend')
             ->addField('rhyme_ups_shipment_identification_number', 'ups_legend', PaletteManipulator::POSITION_APPEND)
+            ->addField('rhyme_ups_shipment_voided_at', 'ups_legend', PaletteManipulator::POSITION_APPEND)
             ->applyToPalette('default', $t)
         ;
 
@@ -35,8 +36,14 @@ namespace {
             'rhyme_ups_shipment_identification_number' => [
                 'exclude'                 => true,
                 'inputType'               => 'text',
-                'eval'                    => ['maxlength' => 32, 'tl_class' => 'w50 clr'],
+                'eval'                    => ['maxlength' => 32, 'doNotCopy'=>true, 'tl_class' => 'w50 clr'],
                 'sql'                     => "varchar(32) NOT NULL default ''"
+            ],
+            'rhyme_ups_shipment_voided_at' => [
+                'exclude'                 => true,
+                'inputType'               => 'text',
+                'eval'                    => array('rgxp'=>'datim', 'doNotCopy'=>true, 'datepicker'=>true, 'tl_class'=>'w50 wizard'),
+                'sql'                     => "varchar(10) NOT NULL default ''"
             ],
         ]);
     }
