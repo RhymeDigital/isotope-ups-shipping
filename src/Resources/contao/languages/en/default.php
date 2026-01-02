@@ -36,6 +36,16 @@ namespace {
     $lang['MSC']['upsTrackDetailsLabel']     = 'Details';
     $lang['MSC']['printShippingLabel']       = 'Print Shipping Label';
     $lang['MSC']['noEnabledUpsServices']     = 'No UPS services have been enabled for this store.';
+    $lang['MSC']['voidShipment']             = $lang['MSC']['voidShipment'] ?? 'Void shipment';
+    $lang['MSC']['shipmentVoidedSuccess']    = $lang['MSC']['shipmentVoidedSuccess'] ?? 'Shipment voided successfully.';
+
+    /**
+     * Errors
+     */
+    $lang['ERR']['upsShipping']              = 'UPS shipping error.%s';
+    $lang['ERR']['upsShipmentPurchase']      = 'UPS shipment purchasing error.%s';
+    $lang['ERR']['upsBeShipmentChildRecord'] = 'There was a problem generating the UPS shipment information.';
+    $lang['ERR']['upsBeShipmentVoid']        = 'There was a problem voiding the UPS shipment.%s';
 
     /**
      * Reference

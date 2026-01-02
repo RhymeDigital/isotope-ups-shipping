@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace {
 
-
     $t = 'tl_iso_shipment';
 
     if (isset($GLOBALS['TL_LANG'][$t]))
@@ -22,6 +21,7 @@ namespace {
          * Fields
          */
         $lang['rhyme_ups_shipment_identification_number'] = ['UPS shipment identification number', 'This is the shipment identification number return from UPS when the shipment has been created in their system.'];
+        $lang['rhyme_ups_shipment_voided_at'] = ['UPS shipment voided at', 'This is the date and time that the shipment was voided.'];
 
         /**
          * Legends
