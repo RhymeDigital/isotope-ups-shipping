@@ -22,7 +22,9 @@ class AddVoidButtonToShipmentList
     public function __invoke(string $buffer, string $template): string
     {
         // This is set via the "parseTemplate" hook
-        if (!$shipmentId = ($GLOBALS['RHYME_UPS_ADD_SHIPMENT_VOID'] ?? null)) {
+        if (!($shipmentId = ($GLOBALS['RHYME_UPS_ADD_SHIPMENT_VOID'] ?? null))
+            || \strpos($template, 'be_iso_shipment') !== 0
+        ) {
             return $buffer;
         }
 
@@ -32,7 +34,7 @@ class AddVoidButtonToShipmentList
         $label = $GLOBALS['TL_LANG']['MSC']['voidShipment'] ?? 'Void Shipment';
 
         $button = \sprintf(
-            '<a href="%s" title="%s" class="tl_submit">%s</a>',
+            '<a href="%s" title="%s" class="tl_submit rhymeUpsVoidShipment" onclick="if(!confirm(\'' . ($GLOBALS['TL_LANG']['MSC']['confirmVoidShipment'] ?? 'Are you sure you want to void this shipment?') . '\'))return false;">%s</a>',
             $href,
             $label . ' ' . $shipmentId,
             $label

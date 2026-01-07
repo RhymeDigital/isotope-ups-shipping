@@ -37,6 +37,7 @@ namespace {
     $lang['MSC']['printShippingLabel']       = 'Print Shipping Label';
     $lang['MSC']['noEnabledUpsServices']     = 'No UPS services have been enabled for this store.';
     $lang['MSC']['voidShipment']             = $lang['MSC']['voidShipment'] ?? 'Void shipment';
+    $lang['MSC']['confirmVoidShipment']      = $lang['MSC']['confirmVoidShipment'] ?? 'Are you sure you want to void this shipment?';
     $lang['MSC']['shipmentVoidedSuccess']    = $lang['MSC']['shipmentVoidedSuccess'] ?? 'Shipment voided successfully.';
 
     /**

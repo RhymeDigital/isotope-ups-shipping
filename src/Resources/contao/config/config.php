@@ -12,9 +12,10 @@ declare(strict_types=1);
 namespace {
 
     use Rhymedigital\IsotopeUpsShipping\Model;
+    use Isotope\Model\Shipping;
 
     /**
      * Shipping methods
      */
-    \Isotope\Model\Shipping::registerModelType('rhyme_ups', Model\Shipping\UPS::class);
+    Shipping::registerModelType('rhyme_ups', Model\Shipping\UPS::class);
 }
