@@ -119,14 +119,6 @@ class UPS extends Iso_Shipping implements UPSShipping
      */
     public function purchaseShipment($shipment)
     {
-        $fnDump = function($var){
-            ob_start();
-            var_dump($var);
-            $result = ob_get_clean();
-            return $result;
-        };
-        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
-        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
         if (($shipment ?? null) !== null
             && \method_exists($shipment, 'getCollection')
             && ($collection = $shipment->getCollection()) instanceof IsotopeProductCollection

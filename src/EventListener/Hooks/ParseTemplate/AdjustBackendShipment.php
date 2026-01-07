@@ -31,7 +31,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * @Hook("parseTemplate")
  */
-class BackendVoidShipmentButton
+class AdjustBackendShipment
 {
     private ContainerInterface $container;
     private ScopeMatcher $scopeMatcher;

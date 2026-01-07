@@ -309,16 +309,6 @@ class UPSHelper
         $preEvent = new PreProductCollectionShipmentEvent($collection, $shippingModel, $ship, $options);
         $this->eventDispatcher->dispatch($preEvent, PreProductCollectionShipmentEvent::NAME);
 
-        $fnDump = function($var){
-            ob_start();
-            var_dump($var);
-            $result = ob_get_clean();
-            return $result;
-        };
-        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
-        log_message($fnDump($ship), 'adam-'.\date('Y-m-d').'.log');
-        log_message($fnDump(__METHOD__), 'adam-'.\date('Y-m-d').'.log');
-
         // Send
         $response = $ship->createShipment(
             $shippingModel->rhyme_ups_client_id,
