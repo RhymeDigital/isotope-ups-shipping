@@ -115,14 +115,12 @@ class UPSHelper
                 || ($shippingModel = $validateEvent->getShipping()) === null
                 || ($shipAddressModel = $collection->getShippingAddress() ?? $collection->getBillingAddress()) === null
                 || ($configModel = $collection->getConfig() ?? Isotope::getConfig()) === null
-                || ($shipper = $this->getShipperForStoreConfig($configModel)) === null
+                || ($shipper = $this->getShipperForStoreConfig((string)($shippingModel->rhyme_ups_account_number ?? ''), $configModel)) === null
                 || ($shipTo = $this->getShipToForAddress($shipAddressModel)) === null
                 || ($shipFrom = $this->getShipFromForStoreConfig($configModel)) === null
             ) {
                 return [];
             }
-
-            $shipper->setShippingNumber($shippingModel->rhyme_ups_account_number ?? '');
 
             // PaymentInformation
             $billShipper = new BillShipper();
@@ -144,7 +142,7 @@ class UPSHelper
 
             // Shipment
             $shipment = new Shipment();
-            $shipment->setDescription($options['shipment_description'] ?? $collection->id);
+            $shipment->setDescription($this->truncate($options['shipment_description'] ?? $collection->id, 50));
             $shipment->setShipper($shipper);
             $shipment->setShipTo($shipTo);
             $shipment->setShipFrom($shipFrom);
@@ -232,14 +230,12 @@ class UPSHelper
             || ($shippingModel = $validateEvent->getShipping()) === null
             || ($shipAddressModel = $collection->getShippingAddress() ?? $collection->getBillingAddress()) === null
             || ($configModel = $collection->getConfig() ?? Isotope::getConfig()) === null
-            || ($shipper = $this->getShipperForStoreConfig($configModel)) === null
+            || ($shipper = $this->getShipperForStoreConfig((string)($shippingModel->rhyme_ups_account_number ?? ''), $configModel)) === null
             || ($shipTo = $this->getShipToForAddress($shipAddressModel)) === null
             || ($shipFrom = $this->getShipFromForStoreConfig($configModel)) === null
         ) {
             return null;
         }
-
-        $shipper->setShippingNumber($shippingModel->rhyme_ups_account_number ?? '');
 
         // PaymentInformation
         $billShipper = new BillShipper();
@@ -261,7 +257,7 @@ class UPSHelper
 
         // Shipment
         $shipment = new Shipment();
-        $shipment->setDescription($options['shipment_description'] ?? $collection->id);
+        $shipment->setDescription($this->truncate($options['shipment_description'] ?? $collection->id, 50));
         $shipment->setShipper($shipper);
         $shipment->setShipTo($shipTo);
         $shipment->setShipFrom($shipFrom);
@@ -490,6 +486,7 @@ class UPSHelper
     /**
      * Retrieves a Shipper object based on the provided store configuration and options.
      *
+     * @param string      $shipperNumber The shipper number to use.
      * @param Config|null $configModel The configuration model to use. If null, the default configuration will be used.
      * @param array       $options     An array of options that may contain:
      *                                 - 'address' (Address|null): A custom address object for the shipper.
@@ -499,7 +496,7 @@ class UPSHelper
      *                                 - 'shipper_fax' (string): The fax number for the shipper.
      * @return Shipper|null Returns the generated Shipper object, or null if configuration is invalid.
      */
-    public function getShipperForStoreConfig(?Config $configModel=null, array $options=[]): ?Shipper
+    public function getShipperForStoreConfig(string $shipperNumber, ?Config $configModel=null, array $options=[]): ?Shipper
     {
         if (($configModel = $configModel ?? Isotope::getConfig()) === null) {
             return null;
@@ -515,21 +512,18 @@ class UPSHelper
         if (($options['phone'] ?? null) && $options['phone'] instanceof Phone) {
             $phone = $options['phone'];
         }
-        else
-        {
-            $phone = new Phone();
-            $phone->setNumber((string)$configModel->phone);
-            $phone->setExtension($options['phone_ext'] ?? '');
+        else {
+            $phone = $this->buildPhone($configModel->phone, $options['phone_ext'] ?? '');
         }
 
         $shipper = new Shipper();
-        $shipper->setName((string)$configModel->company);
-        $shipper->setAttentionName($options['shipper_attn'] ?? '');
-        $shipper->setTaxIdentificationNumber($configModel->taxNumber ?? '');
+        $shipper->setName($this->truncate($configModel->company, 35));
+        $shipper->setAttentionName($this->truncate($options['shipper_attn'] ?? '', 35));
+        $shipper->setTaxIdentificationNumber($this->truncate($configModel->taxNumber, 15));
         $shipper->setPhone($phone);
-        $shipper->setEmail((string)$configModel->email);
-        $shipper->setShippingNumber("0WD271");
-        $shipper->setFaxNumber($options['shipper_fax'] ?? '');
+        $shipper->setEmail($this->truncate($configModel->email, 50));
+        $shipper->setShippingNumber($this->truncate($shipperNumber, 6));
+        $shipper->setFaxNumber($this->truncate($options['shipper_fax'] ?? '', 14));
         $shipper->setAddress($address);
 
         return $shipper;
@@ -565,18 +559,15 @@ class UPSHelper
         if (($options['phone'] ?? null) && $options['phone'] instanceof Phone) {
             $phone = $options['phone'];
         }
-        else
-        {
-            $phone = new Phone();
-            $phone->setNumber((string)$configModel->phone);
-            $phone->setExtension($options['phone_ext'] ?? '');
+        else {
+            $phone = $this->buildPhone($configModel->phone, $options['phone_ext'] ?? '');
         }
 
         $shipFrom = new ShipFrom();
-        $shipFrom->setName((string)$configModel->company);
-        $shipFrom->setAttentionName($options['ship_from_attn'] ?? '');
+        $shipFrom->setName($this->truncate($configModel->company, 35));
+        $shipFrom->setAttentionName($this->truncate($options['ship_from_attn'] ?? '', 35));
         $shipFrom->setPhone($phone);
-        $shipFrom->setFaxNumber($options['ship_from_fax'] ?? '');
+        $shipFrom->setFaxNumber($this->truncate($options['ship_from_fax'] ?? '', 14));
         $shipFrom->setAddress($address);
 
         return $shipFrom;
@@ -608,23 +599,17 @@ class UPSHelper
         if (($options['phone'] ?? null) && $options['phone'] instanceof Phone) {
             $phone = $options['phone'];
         }
-        else
-        {
-            $phone = new Phone();
-            $phone->setNumber((string)$addressModel->phone);
-            $phone->setExtension($options['phone_ext'] ?? '');
+        else {
+            $phone = $this->buildPhone($addressModel->phone, $options['phone_ext'] ?? '');
         }
 
-        if (($options['name'] ?? null)) {
+        if ($options['name'] ?? null) {
             $name = $options['name'];
         }
         else
         {
             // Build name
             $name = [];
-            if (!empty($addressModel->salutation)) {
-                $name[] = (string)$addressModel->salutation;
-            }
             if (!empty($addressModel->firstname)) {
                 $name[] = (string)$addressModel->firstname;
             }
@@ -635,12 +620,12 @@ class UPSHelper
         }
 
         $shipTo = new ShipTo();
-        $shipTo->setName($name);
-        $shipTo->setAttentionName((string)$addressModel->company);
+        $shipTo->setName($this->truncate($name, 35));
+        $shipTo->setAttentionName($this->truncate($addressModel->company, 35));
         $shipTo->setPhone($phone);
-        $shipTo->setEmail((string)$addressModel->email);
+        $shipTo->setEmail($this->truncate($addressModel->email, 50));
         $shipTo->setAddress($address);
-        $shipTo->setResidential($options['residential'] ?? '1');
+        $shipTo->setResidential($this->truncate($options['residential'] ?? '1', 1));
 
         return $shipTo;
     }
@@ -662,7 +647,7 @@ class UPSHelper
         $addressLines = [];
         for ($i = 1; $i <= 3; $i++) {
             if (!empty($objItem->{'street_'.$i})) {
-                $addressLines[] = $objItem->{'street_'.$i};
+                $addressLines[] = $this->truncate($objItem->{'street_'.$i}, 35);
             }
         }
 
@@ -671,10 +656,10 @@ class UPSHelper
 
         $address = new Address();
         $address->setAddressLines($addressLines);
-        $address->setCity((string)$objItem->city);
-        $address->setStateProvinceCode(\count($subdivision) > 1 ? (string)$subdivision[1] : '');
-        $address->setPostalCode((string)$objItem->postal);
-        $address->setCountryCode(\strtoupper((string)$objItem->country));
+        $address->setCity($this->truncate($objItem->city, 30));
+        $address->setStateProvinceCode(\count($subdivision) > 1 ? $this->truncate($subdivision[1], 5) : '');
+        $address->setPostalCode($this->truncate($objItem->postal, 9));
+        $address->setCountryCode(\strtoupper($this->truncate($objItem->country, 2)));
 
         return $address;
     }
@@ -746,6 +731,19 @@ class UPSHelper
         return \md5($strBase);
     }
 
+
+    private function truncate($value, int $length): string
+    {
+        return \substr(\html_entity_decode((string)$value), 0, $length);
+    }
+
+    private function buildPhone($number, $extension = ''): Phone
+    {
+        $phone = new Phone();
+        $phone->setNumber($this->truncate($number, 15));
+        $phone->setExtension($this->truncate($extension, 4));
+        return $phone;
+    }
 
     public function voidShipment(string $shipmentIdentificationNumber, string $clientId, string $clientSecret, bool $debug=false, string $trackingNumber='', array $options=[]): ?array
     {
